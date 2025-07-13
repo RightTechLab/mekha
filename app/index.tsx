@@ -6,7 +6,7 @@ import HeaderIcon from "@/components/HeaderIcon";
 import BalanceCard from "@/components/BalanceCard";
 import TransactionList from "@/components/TransactionList";
 import { getBitcoinPrice } from "@/lib/getBitcoinPrice";
-
+import ReceiveIcon from "@/components/ReceiveIcon";
 
 export default function Index() {
   const [balanceTHB, setBalanceTHB] = useState<number>(100);
@@ -34,27 +34,11 @@ export default function Index() {
       <TransactionList bitcoinPrice={bitcoinPrice} />
       <Pressable
         onPress={() => router.push("/transactionHistory")}
-        style={{
-          backgroundColor: "#47a2abc4",
-          alignItems: "center",
-          paddingVertical: 12,
-          margin: 20,
-          marginBottom: 20,
-        }}
+        style={styles.transactionButton}
       >
-        <Text> ดูประวัติธุรกรรมทั้งหมด</Text>
+        <Text style={styles.transactionText}>ดูประวัติธุรกรรมทั้งหมด</Text>
       </Pressable>
-      <Pressable
-        style={{
-          backgroundColor: "#47a2abc4",
-          alignItems: "center",
-          paddingVertical: 12,
-          margin: 20,
-          marginBottom: 20,
-        }}
-      >
-        <Text> ดูประวัติธุรกรรมทั้งหมด</Text>
-      </Pressable>
+      <ReceiveIcon />
     </SafeAreaView>
   );
 }
@@ -63,5 +47,15 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#ffc3c3",
+  },
+  transactionButton: {
+    backgroundColor: "#47a2abc4",
+    alignItems: "center",
+    marginTop: 40,
+    marginHorizontal: 20,
+  },
+  transactionText: {
+    color: "#fff",
+    fontSize: 16,
   },
 });
