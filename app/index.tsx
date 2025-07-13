@@ -7,12 +7,25 @@ import BalanceCard from "@/components/BalanceCard";
 import TransactionList from "@/components/TransactionList";
 import { getBitcoinPrice } from "@/lib/getBitcoinPrice";
 import ReceiveIcon from "@/components/ReceiveIcon";
+import { getSatBalance } from "@/lib/getSatBalance";
+import { covertSatToThb } from "@/lib/covertSatToThb";
 
 export default function Index() {
-  const [balanceTHB, setBalanceTHB] = useState<number>(100);
+  const [balanceTHB, setBalanceTHB] = useState<number>(0);
   const [bitcoinPrice, setBitcoinPrice] = useState<number>(0);
+  const [satBalance, setSatBalance] = useState<number>(0);
 
   useEffect(() => {
+    const fetSatBalance = async () => {
+      try {
+        const balance = await getSatBalance();
+        setSatBalance(balance);
+        const thbBalance = await covertSatToThb(balance);
+        setBalanceTHB(thbBalance);
+      } catch (error) {
+        console.error("Error fetching satoshi balance:", error);
+      }
+    };
     const fetchBtcPrice = async () => {
       try {
         const btcPrice = await getBitcoinPrice();
@@ -23,6 +36,7 @@ export default function Index() {
     };
 
     fetchBtcPrice();
+    fetSatBalance();
     const interval = setInterval(fetchBtcPrice, 60000); // Update every minute
     return () => clearInterval(interval);
   }, []);
