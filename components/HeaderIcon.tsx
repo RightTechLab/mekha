@@ -1,4 +1,4 @@
-import { View, StyleSheet, Pressable } from "react-native";
+import { View, StyleSheet, Pressable, Platform } from "react-native";
 import { Ionicons, MaterialIcons } from "@expo/vector-icons";
 
 export default function HeaderIcon() {
@@ -25,7 +25,7 @@ const styles = StyleSheet.create({
   header: {
     backgroundColor: "#f8f8f8", //  NOTE: delete this after testing
 
-    marginTop: 20,
+    marginTop: Platform.OS === "android" ? 20 : 0,
     paddingHorizontal: 20,
     paddingVertical: 10,
     flexDirection: "row",

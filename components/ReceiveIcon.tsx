@@ -1,5 +1,5 @@
 import React from "react";
-import { Pressable, Text, StyleSheet, ViewStyle } from "react-native";
+import { Pressable, Text, StyleSheet, ViewStyle, Platform } from "react-native";
 import { Octicons } from "@expo/vector-icons";
 
 export default function ReceiveIcon() {
@@ -16,7 +16,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#63509f",
     paddingVertical: 12,
     marginTop: 8,
-    marginBottom: 20,
+    marginBottom: Platform.OS === "android" ? 40 : 10,
     marginHorizontal: 20,
     borderRadius: 10,
     flexDirection: "row",
