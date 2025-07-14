@@ -6,15 +6,13 @@ interface QRCodeDisplayProps {
   size?: number;
 }
 
-export default function QRCodeDisplay({ value, size = 280 }: QRCodeDisplayProps) {
+export default function QRCodeDisplay({
+  value,
+  size = 280,
+}: QRCodeDisplayProps) {
   return (
     <View style={styles.qrContainer}>
-      <QRCode
-        size={size}
-        color="black"
-        backgroundColor="white"
-        value={value}
-      />
+      <QRCode size={size} color="black" backgroundColor="white" value={value} />
     </View>
   );
 }

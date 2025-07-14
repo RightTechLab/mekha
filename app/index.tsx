@@ -60,16 +60,19 @@ export default function Index() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#ffc3c3",
+    // backgroundColor: "#ffc3c3",
+    backgroundColor: "#fff",
   },
   transactionButton: {
-    backgroundColor: "#47a2abc4",
+    // backgroundColor: "#47a2abc4",
+    backgroundColor: "#fff",
     alignItems: "center",
     marginTop: 40,
     marginHorizontal: 20,
   },
   transactionText: {
-    color: "#fff",
+    color: "#000",
     fontSize: 16,
+    marginBottom: 20,
   },
 });
