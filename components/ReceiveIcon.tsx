@@ -1,10 +1,11 @@
 import React from "react";
 import { Pressable, Text, StyleSheet, ViewStyle, Platform } from "react-native";
 import { Octicons } from "@expo/vector-icons";
+import { router } from "expo-router";
 
 export default function ReceiveIcon() {
   return (
-    <Pressable style={styles.button}>
+    <Pressable style={styles.button} onPress={() => router.push("/receive")}>
       <Octicons name="download" size={32} color="#fff" />
       <Text style={styles.text}>รับเงิน</Text>
     </Pressable>
