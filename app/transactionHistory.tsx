@@ -1,7 +1,7 @@
 import { Pressable, SafeAreaView, StyleSheet, Text } from "react-native";
 import { useEffect, useState } from "react";
 
-import TransactionList from "@/components/TransactionList";
+import TransactionList from "@/components/index/TransactionList";
 import { getBitcoinPrice } from "@/lib/getBitcoinPrice";
 
 export default function TransactionHistory() {

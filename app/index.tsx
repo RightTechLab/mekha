@@ -2,11 +2,11 @@ import { Pressable, SafeAreaView, StyleSheet, Text } from "react-native";
 import { useEffect, useState } from "react";
 import { router } from "expo-router";
 
-import HeaderIcon from "@/components/HeaderIcon";
-import BalanceCard from "@/components/BalanceCard";
-import TransactionList from "@/components/TransactionList";
+import HeaderIcon from "@/components/index/HeaderIcon";
+import BalanceCard from "@/components/index/BalanceCard";
+import TransactionList from "@/components/index/TransactionList";
 import { getBitcoinPrice } from "@/lib/getBitcoinPrice";
-import ReceiveIcon from "@/components/ReceiveIcon";
+import ReceiveIcon from "@/components/index/ReceiveIcon";
 import { getSatBalance } from "@/lib/getSatBalance";
 import { covertSatToThb } from "@/lib/covertSatToThb";
 
