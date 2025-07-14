@@ -22,7 +22,6 @@ export default function Receive() {
       .finally(() => setIsLoading(false));
   }, []);
 
-  // Convert THB to sats
   const convertThbToSats = (thb: number): number => {
     if (bitcoinPriceThb === 0) return 0;
     return Math.round((thb / bitcoinPriceThb) * 100_000_000);
