@@ -20,11 +20,8 @@ export default function HeaderIcon() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#ffc3c3", //  NOTE: delete this after testing
   },
   header: {
-    backgroundColor: "#f8f8f8", //  NOTE: delete this after testing
-
     marginTop: Platform.OS === "android" ? 20 : 0,
     paddingHorizontal: 20,
     paddingVertical: 10,

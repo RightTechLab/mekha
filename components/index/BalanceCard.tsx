@@ -27,7 +27,6 @@ export default function BalanceCard({
 
 const styles = StyleSheet.create({
   balanceCard: {
-    backgroundColor: "#d1ffd1",
     marginTop: 30,
     marginHorizontal: 20,
     padding: 18,
@@ -35,7 +34,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   balanceLabel: {
-    backgroundColor: "#f8f8f8",
     fontSize: 18,
     color: "#333",
   },
