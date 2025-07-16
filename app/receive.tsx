@@ -7,11 +7,16 @@ import {
   Text,
 } from "react-native";
 import { useState, useEffect } from "react";
+import { webln } from "@getalby/sdk";
+import { router } from "expo-router";
+
 import { getBitcoinPrice } from "@/lib/getBitcoinPrice";
 import Header from "@/components/receive/Header";
 import AmountDisplay from "@/components/receive/AmountDisplay";
 import QRCodeDisplay from "@/components/receive/QRCodeDisplay";
 import ActionButton from "@/components/receive/ActionButton";
+
+import { getNwcUrl } from "@/lib/getNwcUrl";
 
 export default function Receive() {
   const [amount, setAmount] = useState<number>(0);
@@ -19,6 +24,85 @@ export default function Receive() {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isModalVisible, setIsModalVisible] = useState<boolean>(false);
   const [inputAmount, setInputAmount] = useState<string>("0");
+
+  const nwcUrl = getNwcUrl();
+  const [invoice, setInvoice] = useState<string | null>(null);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
+  const [paymentStatus, setPaymentStatus] = useState<string | null>(null);
+  const [showSuccessScreen, setShowSuccessScreen] = useState<boolean>(false);
+
+  const createInvoice = async () => {
+    setLoading(true);
+    setError(null);
+    setInvoice(null);
+
+    try {
+      const nostrWebLn = new webln.NostrWebLNProvider({
+        nostrWalletConnectUrl: nwcUrl,
+      });
+      await nostrWebLn.enable();
+
+      const result = await nostrWebLn.makeInvoice({
+        amount: amount,
+        defaultMemo: "Pay with Lightning via NWC",
+      });
+      setInvoice(result.paymentRequest);
+      console.log("Invoice created:", result.paymentRequest);
+
+      // Poll for payment status
+      const pollInterval = 2000; // Check every 2 seconds
+      const maxAttempts = 30; // Stop after 60 seconds (2s * 30)
+      let attempts = 0;
+
+      const checkPaymentStatus = async () => {
+        try {
+          const payed = await nostrWebLn.lookupInvoice({
+            paymentRequest: result.paymentRequest,
+          });
+
+          if (payed.paid) {
+            console.log("pay success");
+            setPaymentStatus("paid");
+            setShowSuccessScreen(true); // Show success screen
+            setTimeout(() => {
+              setShowSuccessScreen(false); // Hide after 5 seconds
+              router.replace("/"); // Navigate to Index page
+            }, 3000);
+            return true; // Stop polling
+          } else {
+            console.log("Invoice not paid yet.");
+            setPaymentStatus("pending");
+            return false; // Continue polling
+          }
+        } catch (e: any) {
+          console.error("❌ Error checking invoice status:", e);
+          setError(e.message || "Error checking payment status");
+          return false; // Continue polling on error
+        }
+      };
+
+      if (await checkPaymentStatus()) return; // If paid, stop polling
+
+      // Start polling
+      const interval = setInterval(async () => {
+        attempts++;
+        if (await checkPaymentStatus()) {
+          clearInterval(interval); // Stop polling if paid
+        } else if (attempts >= maxAttempts) {
+          clearInterval(interval); // Stop polling after max attempts
+          console.log("Stopped polling: Maximum attempts reached.");
+          setPaymentStatus("timeout");
+          setError("Payment check timed out.");
+        }
+      }, pollInterval);
+    } catch (e: any) {
+      console.error("❌ Error creating invoice:", e);
+      setError(e.message || "Unknown error");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
     getBitcoinPrice()
@@ -28,7 +112,8 @@ export default function Receive() {
         setBitcoinPriceThb(0);
       })
       .finally(() => setIsLoading(false));
-  }, []);
+    createInvoice();
+  }, [amount, nwcUrl]);
 
   const convertThbToSats = (thb: number): number => {
     if (bitcoinPriceThb === 0) return 0;
@@ -79,9 +164,25 @@ export default function Receive() {
           isLoading={isLoading}
         />
 
-        <QRCodeDisplay value="https://example.com" />
+        {invoice && <QRCodeDisplay value={invoice} />}
 
         <ActionButton onPress={handleAmountChange} title={getButtonTitle()} />
+
+        {showSuccessScreen && (
+          <View style={styles.successOverlay}>
+            <Text style={styles.successText}>การชำระเงินสำเร็จ!</Text>
+            <View style={styles.checkCircle}>
+              <Text style={styles.checkMark}>✓</Text>
+            </View>
+            <Text style={styles.amountText}>
+              ฿{formatWithCommas(amount.toString())}
+            </Text>
+            <Text style={styles.satsText}>
+              {convertThbToSats(amount).toLocaleString()} sats
+            </Text>
+            <Text style={styles.thankYouText}>ขอบคุณสำหรับการชำระเงิน</Text>
+          </View>
+        )}
 
         <Modal
           visible={isModalVisible}
@@ -213,5 +314,46 @@ const styles = StyleSheet.create({
   keyText: {
     color: "#4B3885", // Dark text for keys
     fontSize: 24,
+  },
+  successOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "rgba(107, 70, 193, 0.95)", // Semi-transparent purple
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 10,
+  },
+  successText: {
+    color: "#FFFFFF",
+    fontSize: 24,
+    fontWeight: "bold",
+    marginBottom: 20,
+  },
+  checkCircle: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: "#FFFFFF",
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 20,
+  },
+  checkMark: {
+    color: "#6B46C1",
+    fontSize: 40,
+    fontWeight: "bold",
+  },
+  satsText: {
+    color: "#FFFFFF",
+    fontSize: 18,
+    marginTop: 10,
+  },
+  thankYouText: {
+    color: "#FFFFFF",
+    fontSize: 16,
+    marginTop: 20,
   },
 });
