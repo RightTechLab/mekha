@@ -6,16 +6,24 @@ interface AmountDisplayProps {
   isLoading: boolean;
 }
 
-export default function AmountDisplay({ amount, satsAmount, isLoading }: AmountDisplayProps) {
+export default function AmountDisplay({
+  amount,
+  satsAmount,
+  isLoading,
+}: AmountDisplayProps) {
+  const formatWithCommas = (value: number): string => {
+    return value.toLocaleString("en-US");
+  };
+
   return (
     <View style={styles.amountContainer}>
       {amount === 0 ? (
         <Text style={styles.noAmount}>ไม่ระบุยอดเงิน</Text>
       ) : (
         <>
-          <Text style={styles.amount}>฿{amount.toFixed(2)}</Text>
+          <Text style={styles.amount}>฿{formatWithCommas(amount)}</Text>
           <Text style={styles.sats}>
-            {isLoading ? "Loading..." : `${satsAmount} sats`}
+            {isLoading ? "Loading..." : `${formatWithCommas(satsAmount)} sats`}
           </Text>
         </>
       )}
