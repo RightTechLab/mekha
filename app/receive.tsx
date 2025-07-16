@@ -3,8 +3,9 @@ import {
   SafeAreaView,
   StyleSheet,
   Modal,
-  TouchableOpacity,
+  Pressable,
   Text,
+  ActivityIndicator,
 } from "react-native";
 import { useState, useEffect } from "react";
 import { webln } from "@getalby/sdk";
@@ -22,7 +23,7 @@ export default function Receive() {
   const [amount, setAmount] = useState<number>(0);
   const [bitcoinPriceThb, setBitcoinPriceThb] = useState<number>(0);
   const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [isModalVisible, setIsModalVisible] = useState<boolean>(false);
+  const [isModalVisible, setIsModalVisible] = useState<boolean>(true);
   const [inputAmount, setInputAmount] = useState<string>("0");
 
   const nwcUrl = getNwcUrl();
@@ -164,6 +165,13 @@ export default function Receive() {
           isLoading={isLoading}
         />
 
+        {loading && !invoice && (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#4B3885" />
+            <Text style={styles.loadingText}>Generating QR Code...</Text>
+          </View>
+        )}
+
         {invoice && <QRCodeDisplay value={invoice} />}
 
         <ActionButton onPress={handleAmountChange} title={getButtonTitle()} />
@@ -194,9 +202,9 @@ export default function Receive() {
             <View style={styles.modalContent}>
               <View style={styles.modalHeader}>
                 <Text style={styles.modalTitle}>Enter Amount</Text>
-                <TouchableOpacity onPress={() => setIsModalVisible(false)}>
+                <Pressable onPress={() => setIsModalVisible(false)}>
                   <Text style={styles.closeButton}>×</Text>
-                </TouchableOpacity>
+                </Pressable>
               </View>
               <View style={styles.amountRow}>
                 <Text style={styles.amountText}>
@@ -217,7 +225,7 @@ export default function Receive() {
               </View>
               <View style={styles.keypad}>
                 {[1, 2, 3, 4, 5, 6, 7, 8, 9, ".", 0, "⌫"].map((item) => (
-                  <TouchableOpacity
+                  <Pressable
                     key={item}
                     style={styles.key}
                     onPress={() =>
@@ -227,7 +235,7 @@ export default function Receive() {
                     }
                   >
                     <Text style={styles.keyText}>{item}</Text>
-                  </TouchableOpacity>
+                  </Pressable>
                 ))}
               </View>
               <ActionButton onPress={handleSetAmount} title="Set Amount" />
@@ -355,5 +363,16 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontSize: 16,
     marginTop: 20,
+  },
+  loadingContainer: {
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 20,
+    marginTop: 100,
+  },
+  loadingText: {
+    color: "#4B3885",
+    fontSize: 16,
+    marginTop: 10,
   },
 });
