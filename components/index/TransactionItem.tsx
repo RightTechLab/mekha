@@ -6,6 +6,7 @@ interface Transaction {
   payment_hash: string;
   settled_at: number;
   type: string;
+  description: string;
 }
 
 interface TransactionItemProps {
@@ -31,6 +32,8 @@ export default function TransactionItem({
           <Text style={styles.amount}>
             {transaction.type === "incoming" ? "+" : "-"}{transaction.amount.toLocaleString()} sat
           </Text>
+          {/* NOTE:  test */}
+          <Text>{transaction.description}</Text>
         </View>
         <View>
           <Text>
@@ -40,7 +43,7 @@ export default function TransactionItem({
                 fontSize: 20,
               }}
             >
-              ฿{thb.toFixed(2)}
+              {transaction.type === "incoming" ? "+" : "-"}฿{thb.toFixed(2)}
             </Text>
           </Text>
         </View>

@@ -9,13 +9,16 @@ interface Transaction {
   payment_hash: string;
   settled_at: number;
   type: string;
+  description: string;
 }
 
 interface TransactionListProps {
   bitcoinPrice: number;
 }
 
-export default function TransactionList({ bitcoinPrice }: TransactionListProps) {
+export default function TransactionList({
+  bitcoinPrice,
+}: TransactionListProps) {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -39,6 +42,17 @@ export default function TransactionList({ bitcoinPrice }: TransactionListProps) 
     fetchTransactions();
   }, []);
 
+  const getBitcoinPriceFromMemo = (defaultMemo: string): number=> {
+    const parts = defaultMemo.split(",");
+    if (parts.length >= 2) {
+      const pricePart = parts[1].trim();
+      const price = parseFloat(pricePart.split(" ")[0]);
+      console.log("Parsed price from memo:", price);
+      return price;
+    }
+    return bitcoinPrice;
+  };
+
   const renderEmptyComponent = () => {
     if (loading) {
       return <Text style={styles.emptyText}>Loading transactions...</Text>;
@@ -55,7 +69,9 @@ export default function TransactionList({ bitcoinPrice }: TransactionListProps) 
     <View style={styles.container}>
       <FlatList
         data={transactions}
-        renderItem={({ item }) => <TransactionItem transaction={item} bitcoinPrice={bitcoinPrice}/>}
+        renderItem={({ item }) => (
+          <TransactionItem transaction={item} bitcoinPrice={getBitcoinPriceFromMemo(item.description)} />
+        )}
         keyExtractor={(item) => item.payment_hash}
         style={styles.flatList}
         ListEmptyComponent={renderEmptyComponent}
