@@ -130,13 +130,35 @@ export default function Receive() {
   };
 
   const handleNumberPress = (number: string) => {
+    console.log("Pressed:", number, "Type:", typeof number); // Debug log
     setInputAmount((prev) => {
-      if (prev === "0" && number !== ".") return number;
-      return prev + number;
+      console.log("Previous:", prev, "Adding:", number); // Debug log
+
+      if (number === "." && prev.includes(".")) {
+        console.log("Decimal already exists, skipping");
+        return prev;
+      }
+
+      if (prev.includes(".") && number !== ".") {
+        const decimalPart = prev.split(".")[1];
+        if (decimalPart && decimalPart.length >= 2) {
+          console.log("Max decimal places reached");
+          return prev;
+        }
+      }
+
+      if (prev === "0" && number !== ".") {
+        console.log("Replacing 0 with", number);
+        return number;
+      }
+
+      const newValue = prev + number;
+      console.log("New value:", newValue);
+      return newValue;
     });
   };
 
-  const handleClear = () => {
+  const handleDelet = () => {
     setInputAmount((prev) => {
       if (prev.length <= 1) return "0"; // If only one digit or "0", reset to "0"
       return prev.slice(0, -1); // Remove the last character
@@ -149,9 +171,28 @@ export default function Receive() {
   };
 
   const formatWithCommas = (value: string): string => {
-    const num = parseFloat(value.replace(/,/g, ""));
-    if (isNaN(num)) return "0";
-    return num.toLocaleString("en-US");
+    if (!value || value === "") return "0";
+
+    const cleanValue = value.replace(/,/g, "");
+
+    // Split by decimal point
+    const parts = cleanValue.split(".");
+    const integerPart = parts[0] || "0";
+    const decimalPart = parts[1];
+
+    // Format integer part with commas
+    const formattedInteger = parseInt(integerPart).toLocaleString("en-US");
+
+    // Reconstruct the number
+    if (parts.length === 1) {
+      return formattedInteger;
+    } else if (decimalPart === undefined || decimalPart === "") {
+      // User typed "1." - show "1."
+      return formattedInteger + ".";
+    } else {
+      // User typed "1.23" - show "1.23"
+      return formattedInteger + "." + decimalPart;
+    }
   };
 
   return (
@@ -224,15 +265,30 @@ export default function Receive() {
                 <Text style={styles.currencyText}>SAT</Text>
               </View>
               <View style={styles.keypad}>
-                {[1, 2, 3, 4, 5, 6, 7, 8, 9, ".", 0, "⌫"].map((item) => (
+                {[
+                  "1",
+                  "2",
+                  "3",
+                  "4",
+                  "5",
+                  "6",
+                  "7",
+                  "8",
+                  "9",
+                  ".",
+                  "0",
+                  "⌫",
+                ].map((item) => (
                   <Pressable
                     key={item}
                     style={styles.key}
-                    onPress={() =>
-                      item === "⌫"
-                        ? handleClear()
-                        : handleNumberPress(item.toString())
-                    }
+                    onPress={() => {
+                      if (item === "⌫") {
+                        handleDelet();
+                      } else {
+                        handleNumberPress(item); // Now item is already a string
+                      }
+                    }}
                   >
                     <Text style={styles.keyText}>{item}</Text>
                   </Pressable>
