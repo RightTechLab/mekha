@@ -32,7 +32,7 @@ export default function TransactionItem({
           <Text style={styles.amount}>
             {transaction.type === "incoming" ? "+" : "-"}{transaction.amount.toLocaleString()} sat
           </Text>
-          {/* NOTE:  test */}
+          {/* DEBUG: use for see transaction description  */}
           <Text>{transaction.description}</Text>
         </View>
         <View>

@@ -12,13 +12,7 @@ interface Transaction {
   description: string;
 }
 
-interface TransactionListProps {
-  bitcoinPrice: number;
-}
-
-export default function TransactionList({
-  bitcoinPrice,
-}: TransactionListProps) {
+export default function TransactionList() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -42,7 +36,8 @@ export default function TransactionList({
     fetchTransactions();
   }, []);
 
-  const getBitcoinPriceFromMemo = (defaultMemo: string): number=> {
+  const getBitcoinPriceFromMemo = (defaultMemo?: string): number => {
+    if (!defaultMemo) return NaN;
     const parts = defaultMemo.split(",");
     if (parts.length >= 2) {
       const pricePart = parts[1].trim();
@@ -50,7 +45,7 @@ export default function TransactionList({
       console.log("Parsed price from memo:", price);
       return price;
     }
-    return bitcoinPrice;
+    return NaN;
   };
 
   const renderEmptyComponent = () => {
@@ -70,7 +65,10 @@ export default function TransactionList({
       <FlatList
         data={transactions}
         renderItem={({ item }) => (
-          <TransactionItem transaction={item} bitcoinPrice={getBitcoinPriceFromMemo(item.description)} />
+          <TransactionItem
+            transaction={item}
+            bitcoinPrice={getBitcoinPriceFromMemo(item.description)}
+          />
         )}
         keyExtractor={(item) => item.payment_hash}
         style={styles.flatList}
