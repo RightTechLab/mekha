@@ -16,7 +16,6 @@ import Header from "@/components/receive/Header";
 import AmountDisplay from "@/components/receive/AmountDisplay";
 import QRCodeDisplay from "@/components/receive/QRCodeDisplay";
 import ActionButton from "@/components/receive/ActionButton";
-
 import { getNwcUrl } from "@/lib/getNwcUrl";
 
 export default function Receive() {
@@ -33,6 +32,7 @@ export default function Receive() {
   const [paymentStatus, setPaymentStatus] = useState<string | null>(null);
   const [showSuccessScreen, setShowSuccessScreen] = useState<boolean>(false);
 
+
   const createInvoice = async () => {
     setLoading(true);
     setError(null);
@@ -46,7 +46,8 @@ export default function Receive() {
 
       const result = await nostrWebLn.makeInvoice({
         amount: convertThbToSats(amount),
-        defaultMemo: "Pay with Lightning via NWC",
+        // 
+        defaultMemo: `${amount} THB, ${bitcoinPriceThb} THB, shopName `,
       });
       setInvoice(result.paymentRequest);
       console.log("Invoice created:", result.paymentRequest);
