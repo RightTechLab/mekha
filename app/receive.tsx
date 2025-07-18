@@ -45,7 +45,7 @@ export default function Receive() {
       await nostrWebLn.enable();
 
       const result = await nostrWebLn.makeInvoice({
-        amount: amount,
+        amount: convertThbToSats(amount),
         defaultMemo: "Pay with Lightning via NWC",
       });
       setInvoice(result.paymentRequest);
