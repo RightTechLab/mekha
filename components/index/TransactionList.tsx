@@ -10,6 +10,7 @@ interface Transaction {
   settled_at: number;
   type: string;
   description: string;
+  invoice: string;
 }
 
 export default function TransactionList() {
