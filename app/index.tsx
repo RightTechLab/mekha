@@ -45,7 +45,7 @@ export default function Index() {
     <SafeAreaView style={styles.container}>
       <HeaderIcon />
       <BalanceCard balanceTHB={balanceTHB} bitcoinPrice={bitcoinPrice} />
-      <TransactionList bitcoinPrice={bitcoinPrice} />
+      <TransactionList/>
       <Pressable
         onPress={() => router.push("/transactionHistory")}
         style={styles.transactionButton}
