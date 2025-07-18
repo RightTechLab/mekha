@@ -18,7 +18,7 @@ export default function BalanceCard({
         ฿ {balanceTHB.toLocaleString(undefined, { minimumFractionDigits: 2 })}
       </Text>
       <Text style={styles.balanceAmountSats}>
-        {balanceSats.toLocaleString(undefined, { minimumFractionDigits: 2 })}{" "}
+        {balanceSats.toLocaleString(undefined, { minimumFractionDigits: 0 })}{" "}
         sats
       </Text>
     </View>
