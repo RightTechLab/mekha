@@ -27,8 +27,9 @@ export default function TransactionItem({
           <Text style={styles.date}>
             {new Date(transaction.settled_at * 1000).toLocaleString()}
           </Text>
+          
           <Text style={styles.amount}>
-            +{transaction.amount.toLocaleString()} sat
+            {transaction.type === "incoming" ? "+" : "-"}{transaction.amount.toLocaleString()} sat
           </Text>
         </View>
         <View>
