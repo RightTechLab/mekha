@@ -1,3 +1,4 @@
+import "@/lib/applyGlobalPolyfills"
 import { Pressable, SafeAreaView, StyleSheet, Text } from "react-native";
 import { useEffect, useState } from "react";
 import { router } from "expo-router";
