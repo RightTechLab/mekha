@@ -1,7 +1,22 @@
 import { View, StyleSheet, Pressable, Platform } from "react-native";
 import { Ionicons, MaterialIcons } from "@expo/vector-icons";
+import { useState } from "react";
 
 export default function HeaderIcon() {
+  const [isModalVisible, setIsModalVisible] = useState<boolean>(false);
+
+  const onModalClose = () => {
+    setIsModalVisible(false);
+  };
+
+  const onModalOpen = () => {
+    setIsModalVisible(true);
+  };
+
+  const onMenuPress = () => {
+    onModalOpen();
+  }
+
   return (
     <View style={styles.header}>
       {/* TODO: impiment onPress anoter */}

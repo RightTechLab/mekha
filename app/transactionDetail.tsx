@@ -28,7 +28,7 @@ export default function TransactionDetail() {
   const parsedTransaction: Transaction = JSON.parse(
     Array.isArray(transaction) ? transaction[0] : transaction || "",
   );
-  console.log("Transaction Detail:", parsedTransaction);
+  // console.log("Transaction Detail:", parsedTransaction);
 
   const btcPrice = getBitcoinPriceFromMemo(parsedTransaction.description);
   const priceInTHB = (parsedTransaction.amount * btcPrice) / 100_000_000;
