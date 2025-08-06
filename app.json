@@ -4,7 +4,7 @@
     "slug": "mekhala",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/images/logoApp.png",
     "scheme": "mekhala",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
@@ -34,7 +34,8 @@
           "backgroundColor": "#ffffff"
         }
       ],
-      "expo-font"
+      "expo-font",
+      "expo-secure-store"
     ],
     "experiments": {
       "typedRoutes": true

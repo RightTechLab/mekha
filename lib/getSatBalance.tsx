@@ -1,8 +1,9 @@
 import { webln } from "@getalby/sdk";
 
-export async function getSatBalance() {
+export async function getSatBalance(nwcUrl: string | undefined) {
   try {
-    const nwcUrl = process.env.EXPO_PUBLIC_NWC_URL;
+    console.log(nwcUrl, "NWC URL from Zustand store");
+    
     const nostrWebLn = new webln.NostrWebLNProvider({
       nostrWalletConnectUrl: nwcUrl,
     });

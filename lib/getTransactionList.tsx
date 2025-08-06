@@ -1,9 +1,8 @@
 import { webln } from "@getalby/sdk";
+import { useNwcStore } from "./State/appStore";
 
-export async function getTransactionList() {
+export async function getTransactionList(nwcUrl: string | undefined) {
   try {
-
-    const nwcUrl = process.env.EXPO_PUBLIC_NWC_URL;
     const nostrWebLn = new webln.NostrWebLNProvider({
       nostrWalletConnectUrl: nwcUrl,
     });
@@ -14,9 +13,8 @@ export async function getTransactionList() {
       offset: 0,
     });
 
-    console.log("Transaction list fetched successfully:", res.transactions);
+    // console.log("Transaction list fetched successfully:", res.transactions);
     return res.transactions;
-
   } catch (error) {
     console.error("Error fetching transaction list:", error);
     throw error;

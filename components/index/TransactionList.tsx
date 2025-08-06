@@ -2,6 +2,7 @@ import { FlatList, StyleSheet, Text, View } from "react-native";
 import { useEffect, useState } from "react";
 import { getTransactionList } from "@/lib/getTransactionList";
 import TransactionItem from "@/components/index/TransactionItem";
+import { useNwcStore } from "@/lib/State/appStore";
 
 interface Transaction {
   amount: number;
@@ -17,14 +18,15 @@ export default function TransactionList() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const nwcUrl = useNwcStore((state) => state.nwcUrl);
 
   useEffect(() => {
     const fetchTransactions = async () => {
       try {
         setLoading(true);
         setError(null);
-        const transactionList = await getTransactionList();
-        console.log("Fetched transactions:", transactionList);
+        const transactionList = await getTransactionList(nwcUrl);
+        // console.log("Fetched transactions:", transactionList);
         setTransactions(transactionList);
       } catch (err) {
         console.log("Failed to fetch transactions. Please try again.", err);
@@ -43,7 +45,7 @@ export default function TransactionList() {
     if (parts.length >= 2) {
       const pricePart = parts[1].trim();
       const price = parseFloat(pricePart.split(" ")[0]);
-      console.log("Parsed price from memo:", price);
+      // console.log("Parsed price from memo:", price);
       return price;
     }
     return NaN;
@@ -71,7 +73,7 @@ export default function TransactionList() {
             bitcoinPrice={getBitcoinPriceFromMemo(item.description)}
           />
         )}
-        keyExtractor={(item) => item.payment_hash}
+        keyExtractor={(item, index) => `${item.payment_hash}-${index}`}
         style={styles.flatList}
         ListEmptyComponent={renderEmptyComponent}
         showsVerticalScrollIndicator={false}

@@ -17,6 +17,7 @@ import AmountDisplay from "@/components/receive/AmountDisplay";
 import QRCodeDisplay from "@/components/receive/QRCodeDisplay";
 import ActionButton from "@/components/receive/ActionButton";
 import { getNwcUrl } from "@/lib/getNwcUrl";
+import { useNwcStore } from "@/lib/State/appStore";
 
 export default function Receive() {
   const [amount, setAmount] = useState<number>(0);
@@ -25,13 +26,12 @@ export default function Receive() {
   const [isModalVisible, setIsModalVisible] = useState<boolean>(true);
   const [inputAmount, setInputAmount] = useState<string>("0");
 
-  const nwcUrl = getNwcUrl();
   const [invoice, setInvoice] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [paymentStatus, setPaymentStatus] = useState<string | null>(null);
   const [showSuccessScreen, setShowSuccessScreen] = useState<boolean>(false);
-
+  const nwcUrl = useNwcStore((state) => state.nwcUrl);
 
   const createInvoice = async () => {
     setLoading(true);
@@ -46,7 +46,7 @@ export default function Receive() {
 
       const result = await nostrWebLn.makeInvoice({
         amount: convertThbToSats(amount),
-        // 
+        //
         defaultMemo: `${amount} THB, ${bitcoinPriceThb} THB, shopName `,
       });
       setInvoice(result.paymentRequest);
@@ -323,7 +323,7 @@ const styles = StyleSheet.create({
   modalContent: {
     backgroundColor: "#ffffff", // Light mode content background
     width: "100%",
-    height: "100%",
+    height: "90%",
     borderRadius: 0,
     padding: 20,
     alignItems: "center",
@@ -386,7 +386,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: "rgba(107, 70, 193, 0.95)", // Semi-transparent purple
+    backgroundColor: "rgb(107, 70, 193)", // Semi-transparent purple
     justifyContent: "center",
     alignItems: "center",
     zIndex: 10,
