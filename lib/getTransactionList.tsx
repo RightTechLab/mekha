@@ -1,5 +1,4 @@
 import { webln } from "@getalby/sdk";
-import { useNwcStore } from "./State/appStore";
 
 export async function getTransactionList(nwcUrl: string | undefined) {
   try {

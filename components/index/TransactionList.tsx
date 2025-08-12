@@ -18,17 +18,28 @@ export default function TransactionList() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  
   const nwcUrl = useNwcStore((state) => state.nwcUrl);
 
   useEffect(() => {
     const fetchTransactions = async () => {
+      // Don't fetch if nwcUrl is not available yet
+      if (!nwcUrl) {
+        console.log("NWC URL not available yet, skipping transaction fetch");
+        setLoading(false);
+        return;
+      }
+
       try {
         setLoading(true);
         setError(null);
+        console.log("Fetching transactions with NWC URL:", nwcUrl);
+        
         const transactionList = await getTransactionList(nwcUrl);
-        // console.log("Fetched transactions:", transactionList);
+        console.log("Fetched transactions:", transactionList);
         setTransactions(transactionList);
       } catch (err) {
+        console.error("Error fetching transaction list:", err);
         console.log("Failed to fetch transactions. Please try again.", err);
         setError("Failed to load transactions");
       } finally {
@@ -37,7 +48,7 @@ export default function TransactionList() {
     };
 
     fetchTransactions();
-  }, []);
+  }, [nwcUrl]); // Add nwcUrl as dependency
 
   const getBitcoinPriceFromMemo = (defaultMemo?: string): number => {
     if (!defaultMemo) return NaN;
@@ -45,7 +56,6 @@ export default function TransactionList() {
     if (parts.length >= 2) {
       const pricePart = parts[1].trim();
       const price = parseFloat(pricePart.split(" ")[0]);
-      // console.log("Parsed price from memo:", price);
       return price;
     }
     return NaN;
@@ -55,11 +65,12 @@ export default function TransactionList() {
     if (loading) {
       return <Text style={styles.emptyText}>Loading transactions...</Text>;
     }
-
     if (error) {
       return <Text style={styles.errorText}>{error}</Text>;
     }
-
+    if (!nwcUrl) {
+      return <Text style={styles.emptyText}>Waiting for wallet connection...</Text>;
+    }
     return <Text style={styles.emptyText}>No transactions found</Text>;
   };
 

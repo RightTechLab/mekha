@@ -29,7 +29,6 @@ export default function Index() {
   const [bitcoinPrice, setBitcoinPrice] = useState<number>(0);
   const [satBalance, setSatBalance] = useState<number>(0);
 
-  // const [isModalVisible, setIsModalVisible] = useState<boolean>(false);
   const [isModalVisible, setIsModalVisible] = useState<boolean>(false);
   const [copiedText, setCopiedText] = useState<string>("");
 
@@ -179,6 +178,18 @@ export default function Index() {
       </Modal>
 
       <HeaderIcon />
+
+      {/*  NOTE: Test when store nwc already */}
+      {/* <View style={{ justifyContent: "center", alignItems: "center" }}> */}
+      {/*   <Pressable */}
+      {/*     onPress={async () => { */}
+      {/*       await SecureStore.deleteItemAsync("nwcUrl"); */}
+      {/*     }} */}
+      {/*   > */}
+      {/*     <Text> Test delete nwcUrl</Text> */}
+      {/*   </Pressable> */}
+      {/* </View> */}
+
       <BalanceCard balanceTHB={balanceTHB} bitcoinPrice={bitcoinPrice} />
       <TransactionList />
       <Pressable
