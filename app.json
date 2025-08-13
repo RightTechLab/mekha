@@ -4,31 +4,43 @@
     "slug": "mekhala",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/logoApp.png",
+    "icon": "./assets/icons/logoApp.png",
     "scheme": "mekhala",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "icon": {
+        "dark": "./assets/icons/mekhala-ios-light.png",
+        "light": "./assets/icons/mekhala-ios-light.png",
+        "tinted": "./assets/icons/mekhala-ios-light.png"
+      },
+      "supportsTablet": true,
+      "bundleIdentifier": "com.phoovich.mekhala"
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/adaptive-icon.png",
+        "foregroundImage": "./assets/icons/adaptive-icon.png",
+        "monochromeImage": "./assets/icons/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "edgeToEdgeEnabled": true
+      "edgeToEdgeEnabled": true,
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO"
+      ],
+      "package": "com.phoovich.mekhala"
     },
     "web": {
       "bundler": "metro",
       "output": "static",
-      "favicon": "./assets/images/favicon.png"
+      "favicon": "./assets/icons/logoApp.png"
     },
     "plugins": [
       "expo-router",
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/splash-icon.png",
+          "image": "./assets/icons/splash-icon-light.png",
           "imageWidth": 200,
           "resizeMode": "contain",
           "backgroundColor": "#ffffff"
@@ -36,12 +48,14 @@
       ],
       "expo-font",
       "expo-secure-store",
-      "expo-camera",
+      [
+        "expo-camera",
         {
           "cameraPermission": "Allow $(PRODUCT_NAME) to access your camera",
           "microphonePermission": "Allow $(PRODUCT_NAME) to access your microphone",
           "recordAudioAndroid": true
         }
+      ]
     ],
     "experiments": {
       "typedRoutes": true

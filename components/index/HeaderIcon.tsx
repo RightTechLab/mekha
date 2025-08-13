@@ -13,11 +13,15 @@ import Feather from "@expo/vector-icons/Feather";
 import * as Clipboard from "expo-clipboard";
 import { useNwcStore } from "@/lib/State/appStore";
 import * as SecureStore from "expo-secure-store";
+import { useCameraPermissions } from "expo-camera";
+import { Link, router } from "expo-router";
 
 export default function HeaderIcon() {
   const [isModalVisible, setIsModalVisible] = useState<boolean>(false);
   const [copiedText, setCopiedText] = useState<string>("");
   const setNwcUrl = useNwcStore((state) => state.setNwcUrl);
+
+  const [permission, requestPermission] = useCameraPermissions();
 
   const onModalClose = () => {
     setIsModalVisible(false);
@@ -60,14 +64,23 @@ export default function HeaderIcon() {
     }
   };
 
-  const onScanPress = async () => {
-    console.log("Scan button pressed");
+  const onScanPress = () => {
+    requestPermission();
+    console.log("Camera permission status:", permission?.granted);
+    router.push("/scanner");
+    onModalClose();
   };
 
   return (
     <View style={styles.header}>
       <Modal animationType="slide" visible={isModalVisible}>
         <View style={styles.modalContainer}>
+          <View style={styles.modalHeader}>
+            <Pressable onPress={() => setIsModalVisible(false)}>
+              <Text style={styles.closeButton}>×</Text>
+            </Pressable>
+          </View>
+
           {/* Welcome Text */}
           <View style={styles.welcomeContainer}>
             <Text style={styles.appNameText}>Mehala Shop</Text>
@@ -95,7 +108,12 @@ export default function HeaderIcon() {
               <Text style={styles.buttonText}>วาง</Text>
             </Pressable>
 
-            <Pressable style={styles.actionButton} onPress={onScanPress}>
+            <Pressable
+              style={styles.actionButton}
+              onPress={() => {
+                onScanPress();
+              }}
+            >
               <MaterialCommunityIcons
                 name="qrcode-scan"
                 size={24}
@@ -234,5 +252,17 @@ const styles = StyleSheet.create({
     color: "#6450A4",
     fontSize: 20,
     fontWeight: "500",
+  },
+  modalHeader: {
+    position: "absolute",
+    top: Platform.OS === "android" ? 30 : 50, // adjust for status bar
+    right: 30, // push to right edge
+    zIndex: 10,
+  },
+
+  closeButton: {
+    color: "#fff",
+    fontSize: 20,
+    fontWeight: "bold",
   },
 });
