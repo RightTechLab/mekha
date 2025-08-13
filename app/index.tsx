@@ -23,6 +23,7 @@ import ReceiveIcon from "@/components/index/ReceiveIcon";
 import { getSatBalance } from "@/lib/getSatBalance";
 import { covertSatToThb } from "@/lib/covertSatToThb";
 import { useNwcStore } from "@/lib/State/appStore";
+import { useCameraPermissions } from "expo-camera";
 
 export default function Index() {
   const [balanceTHB, setBalanceTHB] = useState<number>(0);
@@ -31,6 +32,9 @@ export default function Index() {
 
   const [isModalVisible, setIsModalVisible] = useState<boolean>(false);
   const [copiedText, setCopiedText] = useState<string>("");
+
+  const [permission, requestPermission] = useCameraPermissions();
+  const isPermissionGranted = Boolean(permission?.granted);
 
   const nwcUrl = useNwcStore((state) => state.nwcUrl);
   const setNwcUrl = useNwcStore((state) => state.setNwcUrl);
@@ -42,10 +46,6 @@ export default function Index() {
 
   const onModalClose = () => {
     setIsModalVisible(false);
-  };
-
-  const onModalOpen = () => {
-    setIsModalVisible(true);
   };
 
   const onPastePress = async () => {
@@ -77,12 +77,9 @@ export default function Index() {
     }
   };
 
-  const onScanPress = () => {
-    // Add scan functionality here
-    console.log("Scan pressed");
-  };
+  const onScanPress = () => {};
 
-  const PlaceholderImage = require("@/assets/images/logoApp.png");
+  const PlaceholderImage = require("@/assets/icons/mekhala-ios-light.png");
 
   const checkNwcUrl = async () => {
     const storedNwcUrl = await SecureStore.getItemAsync("nwcUrl");
@@ -165,7 +162,10 @@ export default function Index() {
               <Text style={styles.buttonText}>วาง</Text>
             </Pressable>
 
-            <Pressable style={styles.actionButton} onPress={onScanPress}>
+            <Pressable
+              style={styles.actionButton}
+              disabled={!isPermissionGranted}
+            >
               <MaterialCommunityIcons
                 name="qrcode-scan"
                 size={24}
@@ -187,6 +187,13 @@ export default function Index() {
       {/*     }} */}
       {/*   > */}
       {/*     <Text> Test delete nwcUrl</Text> */}
+      {/*   </Pressable> */}
+      {/* </View> */}
+
+      {/* NOTE: Test go to screen cremara */}
+      {/* <View style={{ justifyContent: "center", alignItems: "center" }}> */}
+      {/*   <Pressable onPress={() => router.push("/scanner")}> */}
+      {/*     <Text>Go to scanner</Text> */}
       {/*   </Pressable> */}
       {/* </View> */}
 
