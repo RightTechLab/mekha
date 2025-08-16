@@ -1,5 +1,7 @@
-import { View, Text, StyleSheet } from "react-native";
+import { View, Text, StyleSheet, Pressable } from "react-native";
 import { useLocalSearchParams } from "expo-router";
+import * as Clipboard from "expo-clipboard";
+import Feather from "@expo/vector-icons/Feather";
 
 interface Transaction {
   amount: number;
@@ -12,14 +14,13 @@ interface Transaction {
 }
 
 export default function TransactionDetail() {
-  const getBitcoinPriceFromMemo = (defaultMemo: string): number => {
+  const getAmountFromMemo = (defaultMemo?: string): number => {
     if (!defaultMemo) return NaN;
     const parts = defaultMemo.split(",");
-    if (parts.length >= 2) {
-      const pricePart = parts[1].trim();
-      const price = parseFloat(pricePart.split(" ")[0]);
-      console.log("Parsed price from memo:", price);
-      return price;
+    if (parts.length >= 1) {
+      const pricePart = parts[0].trim(); // <-- amount อยู่ index 0
+      const price = parseFloat(pricePart);
+      return isNaN(price) ? NaN : price;
     }
     return NaN;
   };
@@ -30,8 +31,11 @@ export default function TransactionDetail() {
   );
   // console.log("Transaction Detail:", parsedTransaction);
 
-  const btcPrice = getBitcoinPriceFromMemo(parsedTransaction.description);
-  const priceInTHB = (parsedTransaction.amount * btcPrice) / 100_000_000;
+  const amount = getAmountFromMemo(parsedTransaction.description);
+
+  const copyInvoiceToClipboard = async () => {
+    await Clipboard.setStringAsync(parsedTransaction.invoice);
+  };
 
   return (
     <View style={styles.container}>
@@ -43,13 +47,29 @@ export default function TransactionDetail() {
       <View style={{ marginBottom: 20 }}>
         <Text style={{ color: "#6750A4", paddingBottom: 5 }}>เวลา</Text>
         <Text>
-          {new Date(parsedTransaction.settled_at * 1000).toLocaleString()}
+          {new Date(parsedTransaction.settled_at * 1000).toLocaleDateString(
+            "th-TH-u-ca-gregory",
+            {
+              year: "numeric",
+              month: "long",
+              day: "numeric",
+            },
+          )}{" "}
+          {new Date(parsedTransaction.settled_at * 1000).toLocaleTimeString(
+            "th-TH",
+            {
+              hour: "2-digit",
+              minute: "2-digit",
+              second: "2-digit",
+              hour12: false,
+            },
+          )}
         </Text>
       </View>
 
       <View style={{ marginBottom: 20 }}>
         <Text style={{ color: "#6750A4", paddingBottom: 5 }}>มูลค่า</Text>
-        <Text>{priceInTHB.toFixed(2)} บาท</Text>
+        <Text>{amount.toFixed(2)} บาท</Text>
       </View>
 
       <View style={{ marginBottom: 20 }}>
@@ -59,7 +79,7 @@ export default function TransactionDetail() {
 
       <View style={{ marginBottom: 20 }}>
         <Text style={{ color: "#6750A4", paddingBottom: 5 }}>สถานะ</Text>
-        <Text style={{ color: "#B3261E" }}>รอการชำระเงิน</Text>
+        <Text style={{ color: "green" }}>ชำระเงินเสร็จสมบูรณ์</Text>
       </View>
 
       <View style={{ marginBottom: 20 }}>
@@ -69,14 +89,41 @@ export default function TransactionDetail() {
         <Text>{parsedTransaction.amount.toLocaleString()} ซาโตชิ</Text>
       </View>
 
-      <View style={{ marginBottom: 20 }}>
-        <Text style={{ color: "#6750A4", paddingBottom: 5 }}>อินวอยซ์หมดอายุใน</Text>
-        <Text>{parsedTransaction.amount.toLocaleString()}55 นาที</Text>
-      </View>
+      {/* <View style={{ marginBottom: 20 }}> */}
+      {/*   <Text style={{ color: "#6750A4", paddingBottom: 5 }}> */}
+      {/*     อินวอยซ์หมดอายุใน */}
+      {/*   </Text> */}
+      {/*   <Text>{parsedTransaction.amount.toLocaleString()}55 นาที</Text> */}
+      {/* </View> */}
 
       <View style={{ marginBottom: 20 }}>
         <Text style={{ color: "#6750A4", paddingBottom: 5 }}>อินวอยซ์</Text>
         <Text>{parsedTransaction.invoice}</Text>
+      </View>
+
+      <View
+        style={{
+          marginBottom: 20,
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        <Pressable
+          onPress={copyInvoiceToClipboard}
+          style={{
+            borderRadius: 14,
+            borderWidth: 2,
+            borderColor: "#6750A4",
+            padding: 8,
+          }}
+        >
+          <View style={{ flexDirection: "row", alignItems: "center" }}>
+            <Feather name="copy" size={24} color="#6750A4" style={{paddingRight: 10}} />
+            <Text style={{ color: "#6750A4" }}>
+              คัดลอกอินวอยซ์ไปยังคลิปบอร์ด
+            </Text>
+          </View>
+        </Pressable>
       </View>
     </View>
   );
@@ -86,6 +133,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     padding: 20,
+    backgroundColor: "#fff",
   },
   text: {
     fontSize: 16,
