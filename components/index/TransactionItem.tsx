@@ -13,19 +13,18 @@ interface Transaction {
 
 interface TransactionItemProps {
   transaction: Transaction;
-  bitcoinPrice: number;
+  amount: number;
 }
 
 export default function TransactionItem({
   transaction,
-  bitcoinPrice,
+  amount,
 }: TransactionItemProps) {
-  const sats = transaction.amount;
-  const thb = (sats * bitcoinPrice) / 100_000_000;
-    const handlePress = () => {
+
+  const handlePress = () => {
     router.push({
       pathname: "/transactionDetail",
-      params: {transaction: JSON.stringify(transaction)}
+      params: { transaction: JSON.stringify(transaction) },
     });
   };
 
@@ -41,7 +40,23 @@ export default function TransactionItem({
         >
           <View>
             <Text style={styles.date}>
-              {new Date(transaction.settled_at * 1000).toLocaleString()}
+              {new Date(transaction.settled_at * 1000).toLocaleDateString(
+                "th-TH-u-ca-gregory",
+                {
+                  year: "numeric",
+                  month: "long",
+                  day: "numeric",
+                },
+              )}{" "}
+              {new Date(transaction.settled_at * 1000).toLocaleTimeString(
+                "th-TH",
+                {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                  second: "2-digit",
+                  hour12: false,
+                },
+              )}
             </Text>
 
             <Text style={styles.amount}>
@@ -53,15 +68,13 @@ export default function TransactionItem({
             {/* <Text>{transaction.description}</Text> */}
           </View>
           <View>
-            <Text>
-              <Text
-                style={{
-                  color: transaction.type === "incoming" ? "green" : "red",
-                  fontSize: 20,
-                }}
-              >
-                {transaction.type === "incoming" ? "+" : "-"}฿{thb.toFixed(2)}
-              </Text>
+            <Text
+              style={{
+                color: transaction.type === "incoming" ? "green" : "red",
+                fontSize: 20,
+              }}
+            >
+              {transaction.type === "incoming" ? "+" : "-"}฿{amount.toFixed(2)}
             </Text>
           </View>
         </View>

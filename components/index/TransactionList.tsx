@@ -18,7 +18,7 @@ export default function TransactionList() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
-  
+
   const nwcUrl = useNwcStore((state) => state.nwcUrl);
 
   useEffect(() => {
@@ -34,7 +34,7 @@ export default function TransactionList() {
         setLoading(true);
         setError(null);
         console.log("Fetching transactions with NWC URL:", nwcUrl);
-        
+
         const transactionList = await getTransactionList(nwcUrl);
         console.log("Fetched transactions:", transactionList);
         setTransactions(transactionList);
@@ -50,13 +50,13 @@ export default function TransactionList() {
     fetchTransactions();
   }, [nwcUrl]); // Add nwcUrl as dependency
 
-  const getBitcoinPriceFromMemo = (defaultMemo?: string): number => {
+  const getAmountFromMemo = (defaultMemo?: string): number => {
     if (!defaultMemo) return NaN;
     const parts = defaultMemo.split(",");
-    if (parts.length >= 2) {
-      const pricePart = parts[1].trim();
-      const price = parseFloat(pricePart.split(" ")[0]);
-      return price;
+    if (parts.length >= 1) {
+      const pricePart = parts[0].trim(); // <-- amount อยู่ index 0
+      const price = parseFloat(pricePart);
+      return isNaN(price) ? NaN : price;
     }
     return NaN;
   };
@@ -69,7 +69,9 @@ export default function TransactionList() {
       return <Text style={styles.errorText}>{error}</Text>;
     }
     if (!nwcUrl) {
-      return <Text style={styles.emptyText}>Waiting for wallet connection...</Text>;
+      return (
+        <Text style={styles.emptyText}>Waiting for wallet connection...</Text>
+      );
     }
     return <Text style={styles.emptyText}>No transactions found</Text>;
   };
@@ -81,7 +83,7 @@ export default function TransactionList() {
         renderItem={({ item }) => (
           <TransactionItem
             transaction={item}
-            bitcoinPrice={getBitcoinPriceFromMemo(item.description)}
+            amount={getAmountFromMemo(item.description)}
           />
         )}
         keyExtractor={(item, index) => `${item.payment_hash}-${index}`}
