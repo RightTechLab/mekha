@@ -77,8 +77,6 @@ export default function Index() {
     }
   };
 
-  const onScanPress = () => {};
-
   const PlaceholderImage = require("@/assets/icons/mekhala-ios-light.png");
 
   const checkNwcUrl = async () => {
@@ -90,6 +88,13 @@ export default function Index() {
     } else {
       setIsModalVisible(true);
     }
+  };
+
+  const onScanPress = () => {
+    requestPermission();
+    console.log("Camera permission status:", permission?.granted);
+    router.push("/scanner");
+    onModalClose();
   };
 
   const fetchSatBalance = async () => {
@@ -164,7 +169,7 @@ export default function Index() {
 
             <Pressable
               style={styles.actionButton}
-              disabled={!isPermissionGranted}
+              onPress={onScanPress}
             >
               <MaterialCommunityIcons
                 name="qrcode-scan"
