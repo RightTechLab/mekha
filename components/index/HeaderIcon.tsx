@@ -125,16 +125,14 @@ export default function HeaderIcon() {
         </View>
       </Modal>
 
-      {/* TODO: impiment onPress anoter */}
       <Pressable
         onPress={() => {
-          console.log("Profile button pressed");
+          router.push("/profile");
         }}
       >
         <Ionicons name="person-circle-outline" size={32} color="#4B3885" />
       </Pressable>
 
-      {/* TODO: impiment onPress anoter */}
       <Pressable
         onPress={() => {
           onMenuPress();
