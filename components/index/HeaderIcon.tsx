@@ -130,7 +130,7 @@ export default function HeaderIcon() {
           router.push("/profile");
         }}
       >
-        <Ionicons name="person-circle-outline" size={32} color="#4B3885" />
+        <Ionicons name="person-circle-outline" size={42} color="#4B3885" />
       </Pressable>
 
       <Pressable
@@ -138,7 +138,7 @@ export default function HeaderIcon() {
           onMenuPress();
         }}
       >
-        <MaterialIcons name="menu" size={32} color="#000" />
+        <MaterialIcons name="menu" size={42} color="#000" />
       </Pressable>
     </View>
   );
