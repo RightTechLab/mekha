@@ -100,6 +100,7 @@ const styles = StyleSheet.create({
     flex: 1,
     marginHorizontal: 20,
     marginTop: 20,
+    borderRadius: 10,
   },
   flatList: {
     backgroundColor: "#fff",
