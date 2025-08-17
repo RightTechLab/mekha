@@ -27,6 +27,14 @@ export default function RootLayout() {
           title: "แสกน QR เชื่อมต่อ nwc",
         }}
       />
+      <Stack.Screen
+        name="profile/edit"
+        options={{
+          headerShown: true,
+          headerStyle: { backgroundColor: "#E8DEF8" },
+          title: "แก้ไขข้อมูลติดต่อ",
+        }}
+      />
     </Stack>
   );
 }
