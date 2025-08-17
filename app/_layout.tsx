@@ -35,6 +35,13 @@ export default function RootLayout() {
           title: "แก้ไขข้อมูลติดต่อ",
         }}
       />
+      <Stack.Screen
+        name="transactionDetail"
+        options={{
+          headerShown: true,
+          title: "",
+        }}
+      />
     </Stack>
   );
 }

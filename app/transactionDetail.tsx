@@ -84,7 +84,7 @@ export default function TransactionDetail() {
 
       <View style={{ marginBottom: 20 }}>
         <Text style={{ color: "#6750A4", paddingBottom: 5 }}>
-          อินวอยซ์หมดอายุใน
+          จำนวน
         </Text>
         <Text>{parsedTransaction.amount.toLocaleString()} ซาโตชิ</Text>
       </View>
