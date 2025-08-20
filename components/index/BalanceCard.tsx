@@ -15,7 +15,7 @@ export default function BalanceCard({
     <View style={styles.balanceCard}>
       <Text style={styles.balanceLabel}>ยอดเงิน</Text>
       <Text style={styles.balanceAmountTHB}>
-        ฿ {balanceTHB.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+        ฿ {balanceTHB.toFixed(2)}
       </Text>
       <Text style={styles.balanceAmountSats}>
         {balanceSats.toLocaleString(undefined, { minimumFractionDigits: 0 })}{" "}
@@ -27,7 +27,7 @@ export default function BalanceCard({
 
 const styles = StyleSheet.create({
   balanceCard: {
-    marginTop: 30,
+    marginTop: 10,
     marginHorizontal: 20,
     padding: 18,
     alignItems: "center",

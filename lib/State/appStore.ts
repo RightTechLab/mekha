@@ -1,4 +1,3 @@
-import { nwc } from "@getalby/sdk";
 import { create } from "zustand";
 
 type NwcState = {
