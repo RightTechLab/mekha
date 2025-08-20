@@ -20,7 +20,6 @@ export default function TransactionItem({
   transaction,
   amount,
 }: TransactionItemProps) {
-
   const handlePress = () => {
     router.push({
       pathname: "/transactionDetail",
@@ -65,7 +64,7 @@ export default function TransactionItem({
             </Text>
 
             {/* NOTE: use for see transaction description  */}
-            {/* <Text>{transaction.description}</Text> */}
+            <Text>{transaction.description}</Text>
           </View>
           <View>
             <Text

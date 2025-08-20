@@ -25,7 +25,6 @@ export default function TransactionList() {
     const fetchTransactions = async () => {
       // Don't fetch if nwcUrl is not available yet
       if (!nwcUrl) {
-        console.log("NWC URL not available yet, skipping transaction fetch");
         setLoading(false);
         return;
       }
@@ -33,10 +32,8 @@ export default function TransactionList() {
       try {
         setLoading(true);
         setError(null);
-        console.log("Fetching transactions with NWC URL:", nwcUrl);
 
         const transactionList = await getTransactionList(nwcUrl);
-        console.log("Fetched transactions:", transactionList);
         setTransactions(transactionList);
       } catch (err) {
         console.error("Error fetching transaction list:", err);
@@ -70,8 +67,6 @@ export default function TransactionList() {
   const filteredTransactions = useMemo(
     () =>
       transactions.filter((item) => {
-        console.log("Filtering transaction:", item);
-
         return item.amount > 1;
       }),
     [transactions],
@@ -96,6 +91,7 @@ export default function TransactionList() {
     <View style={styles.container}>
       <FlatList
         data={filteredTransactions}
+        // DEBUG: see not filtered transactions
         // data={transactions}
         renderItem={({ item }) => (
           <TransactionItem

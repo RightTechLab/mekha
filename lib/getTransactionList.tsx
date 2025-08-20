@@ -7,10 +7,7 @@ export async function getTransactionList(nwcUrl: string | undefined) {
     });
     await nostrWebLn.enable();
 
-    const res = await nostrWebLn.listTransactions({
-      limit: 100,
-      offset: 0,
-    });
+    const res = await nostrWebLn.listTransactions({});
 
     // console.log("Transaction list fetched successfully:", res.transactions);
     return res.transactions;
