@@ -82,12 +82,7 @@ export default function TransactionDetail() {
         <Text style={{ color: "green" }}>ชำระเงินเสร็จสมบูรณ์</Text>
       </View>
 
-      <View style={{ marginBottom: 20 }}>
-        <Text style={{ color: "#6750A4", paddingBottom: 5 }}>
-          จำนวน
-        </Text>
-        <Text>{parsedTransaction.amount.toLocaleString()} ซาโตชิ</Text>
-      </View>
+      <View style={{ marginBottom: 20 }}></View>
 
       {/* <View style={{ marginBottom: 20 }}> */}
       {/*   <Text style={{ color: "#6750A4", paddingBottom: 5 }}> */}
@@ -118,7 +113,12 @@ export default function TransactionDetail() {
           }}
         >
           <View style={{ flexDirection: "row", alignItems: "center" }}>
-            <Feather name="copy" size={24} color="#6750A4" style={{paddingRight: 10}} />
+            <Feather
+              name="copy"
+              size={24}
+              color="#6750A4"
+              style={{ paddingRight: 10 }}
+            />
             <Text style={{ color: "#6750A4" }}>
               คัดลอกอินวอยซ์ไปยังคลิปบอร์ด
             </Text>
