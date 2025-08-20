@@ -42,6 +42,13 @@ export default function RootLayout() {
           title: "",
         }}
       />
+      <Stack.Screen
+        name="receiveThb/index"
+        options={{
+          headerShown: true,
+          title: "Receive THB",
+        }}
+      />
     </Stack>
   );
 }

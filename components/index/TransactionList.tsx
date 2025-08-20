@@ -1,5 +1,5 @@
 import { FlatList, StyleSheet, Text, View } from "react-native";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { getTransactionList } from "@/lib/getTransactionList";
 import TransactionItem from "@/components/index/TransactionItem";
 import { useNwcStore } from "@/lib/State/appStore";
@@ -61,6 +61,22 @@ export default function TransactionList() {
     return NaN;
   };
 
+  // ฟังก์ชันใช้หา amount ที่จะแสดง (แปลงจาก memo ไม่ได้ -> ใช้ item.amount)
+  const getDisplayAmount = (item: Transaction) => {
+    const fromMemo = getAmountFromMemo(item.description);
+    return Number.isFinite(fromMemo) ? fromMemo : item.amount;
+  };
+
+  const filteredTransactions = useMemo(
+    () =>
+      transactions.filter((item) => {
+        console.log("Filtering transaction:", item);
+
+        return item.amount > 1;
+      }),
+    [transactions],
+  );
+
   const renderEmptyComponent = () => {
     if (loading) {
       return <Text style={styles.emptyText}>Loading transactions...</Text>;
@@ -79,11 +95,13 @@ export default function TransactionList() {
   return (
     <View style={styles.container}>
       <FlatList
-        data={transactions}
+        data={filteredTransactions}
+        // data={transactions}
         renderItem={({ item }) => (
           <TransactionItem
             transaction={item}
-            amount={getAmountFromMemo(item.description)}
+            // amount={getAmountFromMemo(item.description)}
+            amount={getDisplayAmount(item)}
           />
         )}
         keyExtractor={(item, index) => `${item.payment_hash}-${index}`}

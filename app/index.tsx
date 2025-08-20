@@ -167,10 +167,7 @@ export default function Index() {
               <Text style={styles.buttonText}>วาง</Text>
             </Pressable>
 
-            <Pressable
-              style={styles.actionButton}
-              onPress={onScanPress}
-            >
+            <Pressable style={styles.actionButton} onPress={onScanPress}>
               <MaterialCommunityIcons
                 name="qrcode-scan"
                 size={24}
@@ -202,7 +199,9 @@ export default function Index() {
       {/*   </Pressable> */}
       {/* </View> */}
 
-      <BalanceCard balanceTHB={balanceTHB} bitcoinPrice={bitcoinPrice} />
+      <Pressable onPress={() => router.push("/receiveThb")}>
+        <BalanceCard balanceTHB={balanceTHB} bitcoinPrice={bitcoinPrice} />
+      </Pressable>
       <TransactionList />
       <Pressable
         onPress={() => router.push("/transactionHistory")}
@@ -218,7 +217,6 @@ export default function Index() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    // backgroundColor: "#ffc3c3",
     backgroundColor: "#fff",
   },
   transactionButton: {
