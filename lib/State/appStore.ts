@@ -30,7 +30,7 @@ export const useBalanceStore = create<BalanceState>()((set, get) => ({
       await SecureStore.setItemAsync(ALL_THB_RECEIVE_STORAGE_KEY, amount.toString());
       // Update state
       set({ allThbReceive: amount });
-      console.log("Saved allThbReceive to SecureStore:", amount);
+      // console.log("Saved allThbReceive to SecureStore:", amount);
     } catch (error) {
       console.error("Error saving allThbReceive to SecureStore:", error);
       // Still update state even if storage fails
@@ -45,7 +45,7 @@ export const useBalanceStore = create<BalanceState>()((set, get) => ({
         const amount = parseFloat(storedValue);
         if (!isNaN(amount)) {
           set({ allThbReceive: amount, isLoaded: true });
-          console.log("Loaded allThbReceive from SecureStore:", amount);
+          // console.log("Loaded allThbReceive from SecureStore:", amount);
         } else {
           set({ allThbReceive: 0, isLoaded: true });
         }
