@@ -22,7 +22,7 @@ import { getBitcoinPrice } from "@/lib/getBitcoinPrice";
 import ReceiveIcon from "@/components/index/ReceiveIcon";
 import { getSatBalance } from "@/lib/getSatBalance";
 import { covertSatToThb } from "@/lib/covertSatToThb";
-import { useNwcStore } from "@/lib/State/appStore";
+import { useBalanceStore, useNwcStore } from "@/lib/State/appStore";
 import { useCameraPermissions } from "expo-camera";
 
 export default function Index() {
@@ -38,6 +38,9 @@ export default function Index() {
 
   const nwcUrl = useNwcStore((state) => state.nwcUrl);
   const setNwcUrl = useNwcStore((state) => state.setNwcUrl);
+
+   const loadAllThbReceive = useBalanceStore((state) => state.loadAllThbReceive);
+  const isLoaded = useBalanceStore((state) => state.isLoaded);
 
   const fetchCopiedText = async () => {
     const text = await Clipboard.getStringAsync();
@@ -119,6 +122,10 @@ export default function Index() {
   useEffect(() => {
     checkNwcUrl();
   }, []);
+
+  useEffect(() => {
+    loadAllThbReceive();
+  }, [loadAllThbReceive]);
 
   useEffect(() => {
     if (nwcUrl) {

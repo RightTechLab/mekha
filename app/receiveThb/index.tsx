@@ -87,6 +87,7 @@ export default function receiveThb() {
   const nwcUrl = useNwcStore((state) => state.nwcUrl);
   const allThbReceive = useBalanceStore((state) => state.allThbReceive);
   const setAllThbReceive = useBalanceStore((state) => state.setAllThbReceive);
+
   const [nostrWebLn, setNostrWebLn] =
     useState<webln.NostrWebLNProvider | null>();
   const [isModalVisible, setIsModalVisible] = useState<boolean>(false);
@@ -149,9 +150,14 @@ export default function receiveThb() {
       sum -= getAmountFromMemo(item.description);
       return sum;
     }, 0);
-    setAllThbReceive(totalThb);
+
+    const updateBalance = () => {
+      setAllThbReceive(totalThb);
+    };
+    updateBalance();
+
     return filltered;
-  }, [transactions]);
+  }, [transactions, setAllThbReceive]);
 
   const renderEmptyComponent = () => {
     if (loading) {
