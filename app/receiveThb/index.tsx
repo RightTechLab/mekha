@@ -2,7 +2,6 @@ import {
   StyleSheet,
   SafeAreaView,
   Platform,
-  Button,
   Modal,
   Pressable,
   View,
@@ -10,7 +9,7 @@ import {
   FlatList,
 } from "react-native";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useNwcStore } from "@/lib/State/appStore";
+import { useBalanceStore, useNwcStore } from "@/lib/State/appStore";
 import { webln } from "@getalby/sdk";
 import ActionButton from "@/components/receive/ActionButton";
 import { getTransactionList } from "@/lib/getTransactionList";
@@ -86,6 +85,8 @@ function TransactionItem({ transaction, amount }: TransactionItemProps) {
 
 export default function receiveThb() {
   const nwcUrl = useNwcStore((state) => state.nwcUrl);
+  const allThbReceive = useBalanceStore((state) => state.allThbReceive);
+  const setAllThbReceive = useBalanceStore((state) => state.setAllThbReceive);
   const [nostrWebLn, setNostrWebLn] =
     useState<webln.NostrWebLNProvider | null>();
   const [isModalVisible, setIsModalVisible] = useState<boolean>(false);
@@ -94,7 +95,7 @@ export default function receiveThb() {
   const [transactions, setTransactions] = useState<webln.Transaction[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
-  const [allThaiReceive, setAllThaiReceive] = useState<number>(0);
+  // const [allThbReceive, setAllThbReceive] = useState<number>(0);
 
   const fetchTransactions = useCallback(async () => {
     // Don't fetch if nwcUrl is not available yet
@@ -119,7 +120,7 @@ export default function receiveThb() {
     } finally {
       setLoading(false);
     }
-  },[nwcUrl]);
+  }, [nwcUrl]);
 
   useEffect(() => {
     fetchTransactions();
@@ -148,7 +149,7 @@ export default function receiveThb() {
       sum -= getAmountFromMemo(item.description);
       return sum;
     }, 0);
-    setAllThaiReceive(totalThb);
+    setAllThbReceive(totalThb);
     return filltered;
   }, [transactions]);
 
@@ -291,7 +292,7 @@ export default function receiveThb() {
     <SafeAreaView style={{ flex: 1, backgroundColor: "#fff" }}>
       <View style={styles.balanceCard}>
         <Text style={styles.balanceLabel}>ยอดเงินบาทที่ได้รับ</Text>
-        <Text style={styles.balanceAmountTHB}>฿ {allThaiReceive}</Text>
+        <Text style={styles.balanceAmountTHB}>฿ {allThbReceive}</Text>
       </View>
 
       {/* Trasaction List */}
