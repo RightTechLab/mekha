@@ -16,7 +16,6 @@ import Header from "@/components/receive/Header";
 import AmountDisplay from "@/components/receive/AmountDisplay";
 import QRCodeDisplay from "@/components/receive/QRCodeDisplay";
 import ActionButton from "@/components/receive/ActionButton";
-import { getNwcUrl } from "@/lib/getNwcUrl";
 import { useNwcStore } from "@/lib/State/appStore";
 
 export default function Receive() {
@@ -34,6 +33,11 @@ export default function Receive() {
   const nwcUrl = useNwcStore((state) => state.nwcUrl);
 
   const createInvoice = async () => {
+    if (amount <= 0) {
+      setError("Amount must be greater than zero");
+      return;
+    }
+
     setLoading(true);
     setError(null);
     setInvoice(null);
@@ -113,7 +117,9 @@ export default function Receive() {
         setBitcoinPriceThb(0);
       })
       .finally(() => setIsLoading(false));
-    createInvoice();
+    if (amount > 0 && nwcUrl) {
+      createInvoice();
+    }
   }, [amount, nwcUrl]);
 
   const convertThbToSats = (thb: number): number => {
