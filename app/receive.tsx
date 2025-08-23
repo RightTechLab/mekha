@@ -49,7 +49,7 @@ export default function Receive() {
         defaultMemo: `${amount.toFixed(2)},shopName`,
       });
       setInvoice(result.paymentRequest);
-      console.log("Invoice created:", result.paymentRequest);
+      // console.log("Invoice created:", result.paymentRequest);
 
       // Poll for payment status
       const pollInterval = 2000; // Check every 2 seconds
@@ -63,7 +63,7 @@ export default function Receive() {
           });
 
           if (payed.paid) {
-            console.log("pay success");
+            // console.log("pay success");
             setPaymentStatus("paid");
             setShowSuccessScreen(true); // Show success screen
             setTimeout(() => {
@@ -72,7 +72,7 @@ export default function Receive() {
             }, 3000);
             return true; // Stop polling
           } else {
-            console.log("Invoice not paid yet.");
+            // console.log("Invoice not paid yet.");
             setPaymentStatus("pending");
             return false; // Continue polling
           }
@@ -92,14 +92,14 @@ export default function Receive() {
           clearInterval(interval); // Stop polling if paid
         } else if (attempts >= maxAttempts) {
           clearInterval(interval); // Stop polling after max attempts
-          console.log("Stopped polling: Maximum attempts reached.");
+          // console.log("Stopped polling: Maximum attempts reached.");
           setPaymentStatus("timeout");
           setError("Payment check timed out.");
         }
       }, pollInterval);
-    } catch (e: any) {
-      console.error("❌ Error creating invoice:", e);
-      setError(e.message || "Unknown error");
+    } catch (error: any) {
+      console.error("Error creating invoice:", error);
+      setError(error.message || "Unknown error");
     } finally {
       setLoading(false);
     }
@@ -130,30 +130,30 @@ export default function Receive() {
   };
 
   const handleNumberPress = (number: string) => {
-    console.log("Pressed:", number, "Type:", typeof number); // Debug log
+    // console.log("Pressed:", number, "Type:", typeof number); // Debug log
     setInputAmount((prev) => {
-      console.log("Previous:", prev, "Adding:", number); // Debug log
+      // console.log("Previous:", prev, "Adding:", number); // Debug log
 
       if (number === "." && prev.includes(".")) {
-        console.log("Decimal already exists, skipping");
+        // console.log("Decimal already exists, skipping");
         return prev;
       }
 
       if (prev.includes(".") && number !== ".") {
         const decimalPart = prev.split(".")[1];
         if (decimalPart && decimalPart.length >= 2) {
-          console.log("Max decimal places reached");
+          // console.log("Max decimal places reached");
           return prev;
         }
       }
 
       if (prev === "0" && number !== ".") {
-        console.log("Replacing 0 with", number);
+        // console.log("Replacing 0 with", number);
         return number;
       }
 
       const newValue = prev + number;
-      console.log("New value:", newValue);
+      // console.log("New value:", newValue);
       return newValue;
     });
   };
