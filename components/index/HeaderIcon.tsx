@@ -83,7 +83,7 @@ export default function HeaderIcon() {
 
           {/* Welcome Text */}
           <View style={styles.welcomeContainer}>
-            <Text style={styles.appNameText}>Mehala Shop</Text>
+            <Text style={styles.appNameText}>Mekha Shop</Text>
           </View>
 
           {/* Description Text */}

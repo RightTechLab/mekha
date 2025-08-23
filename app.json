@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "mekhala",
-    "slug": "mekhala",
+    "name": "mekha",
+    "slug": "mekha",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icons/logoApp.png",
-    "scheme": "mekhala",
+    "scheme": "mekha",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
@@ -15,7 +15,7 @@
         "tinted": "./assets/icons/mekhala-ios-light.png"
       },
       "supportsTablet": true,
-      "bundleIdentifier": "com.phoovich.mekhala"
+      "bundleIdentifier": "com.phoovich.mekha"
     },
     "android": {
       "adaptiveIcon": {
@@ -28,7 +28,7 @@
         "android.permission.CAMERA",
         "android.permission.RECORD_AUDIO"
       ],
-      "package": "com.phoovich.mekhala"
+      "package": "com.phoovich.mekha"
     },
     "web": {
       "bundler": "metro",
