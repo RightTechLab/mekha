@@ -67,7 +67,6 @@ export default function Scanner() {
           ) {
             qrLock.current = true;
             setTimeout(async () => {
-              console.log("Scanned data:", data);
               setNwcUrl(data);
               await SecureStore.setItemAsync("nwcUrl", data);
               router.replace("/");

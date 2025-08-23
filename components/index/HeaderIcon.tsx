@@ -66,7 +66,6 @@ export default function HeaderIcon() {
 
   const onScanPress = async () => {
     await requestPermission();
-    console.log("Camera permission status:", permission?.granted);
     router.push("/scanner");
     onModalClose();
   };
