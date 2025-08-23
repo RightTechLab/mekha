@@ -57,7 +57,7 @@ export default function HeaderIcon() {
       // Close the modal
       onModalClose();
 
-      console.log("NWC URL saved successfully:", text);
+      // console.log("NWC URL saved successfully:", text);
     } catch (error) {
       console.error("Error saving NWC URL:", error);
       // You might want to show an error message to the user here

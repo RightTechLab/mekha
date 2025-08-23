@@ -101,7 +101,7 @@ export default function receiveThb() {
   const fetchTransactions = useCallback(async () => {
     // Don't fetch if nwcUrl is not available yet
     if (!nwcUrl) {
-      console.log("NWC URL not available yet, skipping transaction fetch");
+      // console.log("NWC URL not available yet, skipping transaction fetch");
       setLoading(false);
       return;
     }
@@ -109,10 +109,10 @@ export default function receiveThb() {
     try {
       setLoading(true);
       setError(null);
-      console.log("Fetching transactions with NWC URL:", nwcUrl);
+      // console.log("Fetching transactions with NWC URL:", nwcUrl);
 
       const transactionList = await getTransactionList(nwcUrl);
-      console.log("Fetched transactions:", transactionList);
+      // console.log("Fetched transactions:", transactionList);
       setTransactions(transactionList);
     } catch (err) {
       console.error("Error fetching transaction list:", err);
@@ -187,30 +187,30 @@ export default function receiveThb() {
   };
 
   const handleNumberPress = (number: string) => {
-    console.log("Pressed:", number, "Type:", typeof number); // Debug log
+    // console.log("Pressed:", number, "Type:", typeof number); // Debug log
     setInputAmount((prev) => {
-      console.log("Previous:", prev, "Adding:", number); // Debug log
+      // console.log("Previous:", prev, "Adding:", number); // Debug log
 
       if (number === "." && prev.includes(".")) {
-        console.log("Decimal already exists, skipping");
+        // console.log("Decimal already exists, skipping");
         return prev;
       }
 
       if (prev.includes(".") && number !== ".") {
         const decimalPart = prev.split(".")[1];
         if (decimalPart && decimalPart.length >= 2) {
-          console.log("Max decimal places reached");
+          // console.log("Max decimal places reached");
           return prev;
         }
       }
 
       if (prev === "0" && number !== ".") {
-        console.log("Replacing 0 with", number);
+        // console.log("Replacing 0 with", number);
         return number;
       }
 
       const newValue = prev + number;
-      console.log("New value:", newValue);
+      // console.log("New value:", newValue);
       return newValue;
     });
   };
@@ -251,7 +251,7 @@ export default function receiveThb() {
       });
       await nostrWebLn.enable();
       setNostrWebLn(nostrWebLn);
-      console.log("WebLN provider initialized with NWC URL:", nostrWebLn);
+      // console.log("WebLN provider initialized with NWC URL:", nostrWebLn);
     } catch (error) {
       console.error("Error creating NWC client:", error);
       throw error;
@@ -271,7 +271,7 @@ export default function receiveThb() {
       try {
         if (bolt11) {
           const paymentResult = await nostrWebLn?.sendPayment(bolt11);
-          console.log("Payment result:", paymentResult);
+          // console.log("Payment result:", paymentResult);
           await fetchTransactions();
         } else {
           console.error("No bolt11 invoice generated");
