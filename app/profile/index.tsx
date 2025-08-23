@@ -57,9 +57,9 @@ export default function CustomerProfile() {
           }
         />
         <Field label="Line ID" value={lineId || ""} />
-        <Field label="รอบจ่าย" value={paymentCycle || ""} />
-        <Field label="วันแรกของรอบจ่าย" value={firstPaymentDay || ""} />
-        <Field label="Premium" value={premiumRate || ""} />
+        {/* <Field label="รอบจ่าย" value={paymentCycle || ""} /> */}
+        {/* <Field label="วันแรกของรอบจ่าย" value={firstPaymentDay || ""} /> */}
+        {/* <Field label="Premium" value={premiumRate || ""} /> */}
 
         {/* bottom spacer */}
         <View style={{ height: 24 }} />
