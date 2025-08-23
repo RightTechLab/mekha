@@ -90,9 +90,8 @@ export default function Index() {
     }
   };
 
-  const onScanPress = () => {
-    requestPermission();
-    console.log("Camera permission status:", permission?.granted);
+  const onScanPress = async () => {
+    await requestPermission();
     router.push("/scanner");
     onModalClose();
   };
