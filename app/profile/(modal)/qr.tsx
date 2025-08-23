@@ -9,7 +9,7 @@ export default function QRCodeScreen() {
     <SafeAreaView style={styles.container}>
       <Stack.Screen
         options={{
-          title: "เชื่อมต่อกับ Mekhala Shop เครื่องอื่น",
+          title: "เชื่อมต่อกับ Mekha Shop เครื่องอื่น",
           headerShown: true,
           headerStyle: { backgroundColor: "#E8DEF8" },
         }}
@@ -18,7 +18,7 @@ export default function QRCodeScreen() {
       <View style={styles.content}>
         <QRCode value={nwcUrl} size={200} />
         <View style={{ marginTop: 40 ,alignItems: "center",justifyContent: "center"}}>
-          <Text style={{fontSize:18}}>แสกน QR โค้ดนี้ด้วยแอพ Mekhala Shop</Text>
+          <Text style={{fontSize:18}}>แสกน QR โค้ดนี้ด้วยแอพ Mekha Shop</Text>
           <Text style={{fontSize:18}}>บนโทรศัพท์เครื่องอื่นเพื่อใช้รับเงิน</Text>
           <Text style={{fontSize:18}}>ในร้านค้าเดียวกัน</Text>
         </View>
