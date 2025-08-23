@@ -46,7 +46,7 @@ export default function Receive() {
 
       const result = await nostrWebLn.makeInvoice({
         amount: convertThbToSats(amount),
-        defaultMemo: `${amount.toFixed(2)},shopName`,
+        defaultMemo: `${amount.toFixed(2)}`,
       });
       setInvoice(result.paymentRequest);
       // console.log("Invoice created:", result.paymentRequest);
