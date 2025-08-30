@@ -27,7 +27,10 @@ export const useBalanceStore = create<BalanceState>()((set, get) => ({
   setAllThbReceive: async (amount) => {
     try {
       // Save to SecureStore
-      await SecureStore.setItemAsync(ALL_THB_RECEIVE_STORAGE_KEY, amount.toString());
+      await SecureStore.setItemAsync(
+        ALL_THB_RECEIVE_STORAGE_KEY,
+        amount.toString(),
+      );
       // Update state
       set({ allThbReceive: amount });
       // console.log("Saved allThbReceive to SecureStore:", amount);
@@ -40,7 +43,9 @@ export const useBalanceStore = create<BalanceState>()((set, get) => ({
 
   loadAllThbReceive: async () => {
     try {
-      const storedValue = await SecureStore.getItemAsync(ALL_THB_RECEIVE_STORAGE_KEY);
+      const storedValue = await SecureStore.getItemAsync(
+        ALL_THB_RECEIVE_STORAGE_KEY,
+      );
       if (storedValue !== null) {
         const amount = parseFloat(storedValue);
         if (!isNaN(amount)) {

@@ -34,18 +34,11 @@ export default function Index() {
   const [copiedText, setCopiedText] = useState<string>("");
 
   const [permission, requestPermission] = useCameraPermissions();
-  const isPermissionGranted = Boolean(permission?.granted);
 
   const nwcUrl = useNwcStore((state) => state.nwcUrl);
   const setNwcUrl = useNwcStore((state) => state.setNwcUrl);
 
-   const loadAllThbReceive = useBalanceStore((state) => state.loadAllThbReceive);
-  const isLoaded = useBalanceStore((state) => state.isLoaded);
-
-  const fetchCopiedText = async () => {
-    const text = await Clipboard.getStringAsync();
-    setCopiedText(text);
-  };
+  const loadAllThbReceive = useBalanceStore((state) => state.loadAllThbReceive);
 
   const onModalClose = () => {
     setIsModalVisible(false);

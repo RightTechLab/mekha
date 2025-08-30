@@ -13,7 +13,6 @@ export default function BalanceCard({
   const balanceSats = balanceTHB / (bitcoinPrice / 100000000);
 
   const allThbReceive = useBalanceStore((state) => state.allThbReceive);
-  
 
   const adjustedBalance = balanceTHB - allThbReceive;
   // const adjustedBalanceSats = adjustedBalance / (bitcoinPrice / 100000000);
@@ -25,8 +24,7 @@ export default function BalanceCard({
         ฿ {adjustedBalance.toFixed(2)}
       </Text>
       <Text style={styles.balanceAmountSats}>
-        {balanceSats.toFixed(0)}{" "}
-        sats
+        {balanceSats.toFixed(0)} sats
       </Text>
     </View>
   );

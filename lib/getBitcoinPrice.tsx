@@ -7,6 +7,6 @@ export async function getBitcoinPrice(): Promise<number> {
     return data.THB_BTC.last;
   } catch (error) {
     console.error("Error fetching Bitcoin price:", error);
-    throw error; 
+    throw error;
   }
 }

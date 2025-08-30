@@ -17,10 +17,20 @@ export default function QRCodeScreen() {
 
       <View style={styles.content}>
         <QRCode value={nwcUrl} size={200} />
-        <View style={{ marginTop: 40 ,alignItems: "center",justifyContent: "center"}}>
-          <Text style={{fontSize:18}}>แสกน QR โค้ดนี้ด้วยแอพ Mekha Shop</Text>
-          <Text style={{fontSize:18}}>บนโทรศัพท์เครื่องอื่นเพื่อใช้รับเงิน</Text>
-          <Text style={{fontSize:18}}>ในร้านค้าเดียวกัน</Text>
+        <View
+          style={{
+            marginTop: 40,
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <Text style={{ fontSize: 18 }}>
+            แสกน QR โค้ดนี้ด้วยแอพ Mekha Shop
+          </Text>
+          <Text style={{ fontSize: 18 }}>
+            บนโทรศัพท์เครื่องอื่นเพื่อใช้รับเงิน
+          </Text>
+          <Text style={{ fontSize: 18 }}>ในร้านค้าเดียวกัน</Text>
         </View>
       </View>
     </SafeAreaView>
