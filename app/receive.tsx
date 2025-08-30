@@ -6,6 +6,7 @@ import {
   Pressable,
   Text,
   ActivityIndicator,
+  Platform,
 } from "react-native";
 import { useState, useEffect } from "react";
 import { webln } from "@getalby/sdk";
@@ -15,7 +16,6 @@ import { getBitcoinPrice } from "@/lib/getBitcoinPrice";
 import Header from "@/components/receive/Header";
 import AmountDisplay from "@/components/receive/AmountDisplay";
 import QRCodeDisplay from "@/components/receive/QRCodeDisplay";
-import ActionButton from "@/components/receive/ActionButton";
 import { useNwcStore } from "@/lib/State/appStore";
 
 export default function Receive() {
@@ -53,7 +53,6 @@ export default function Receive() {
         defaultMemo: `${amount.toFixed(2)}`,
       });
       setInvoice(result.paymentRequest);
-      // console.log("Invoice created:", result.paymentRequest);
 
       // Poll for payment status
       const pollInterval = 2000; // Check every 2 seconds
@@ -221,7 +220,9 @@ export default function Receive() {
 
         {invoice && <QRCodeDisplay value={invoice} />}
 
-        <ActionButton onPress={handleAmountChange} title={getButtonTitle()} />
+        <Pressable onPress={handleAmountChange} style={styles.editButton}>
+          <Text style={styles.editButtonText}>{getButtonTitle()}</Text>
+        </Pressable>
 
         {showSuccessScreen && (
           <View style={styles.successOverlay}>
@@ -229,7 +230,7 @@ export default function Receive() {
             <View style={styles.checkCircle}>
               <Text style={styles.checkMark}>✓</Text>
             </View>
-            <Text style={styles.amountText}>
+            <Text style={{ fontSize: 24, color: "#fff", marginRight: 10 }}>
               ฿{formatWithCommas(amount.toString())}
             </Text>
             <Text style={styles.satsText}>
@@ -300,7 +301,9 @@ export default function Receive() {
                   </Pressable>
                 ))}
               </View>
-              <ActionButton onPress={handleSetAmount} title="Set Amount" />
+              <Pressable onPress={handleSetAmount} style={styles.confirmButton}>
+                <Text style={styles.confirmButtonText}>Set Amount</Text>
+              </Pressable>
             </View>
           </View>
         </Modal>
@@ -436,5 +439,39 @@ const styles = StyleSheet.create({
     color: "#4B3885",
     fontSize: 16,
     marginTop: 10,
+  },
+  editButton: {
+    backgroundColor: "#E6CCE9",
+    paddingVertical: 18,
+    paddingHorizontal: 40,
+    borderRadius: 30,
+    borderWidth: 2,
+    borderColor: "#9575CD",
+    width: "90%",
+    position: "absolute",
+    bottom: Platform.OS === "ios" ? 50 : 85,
+  },
+  editButtonText: {
+    fontSize: 18,
+    textAlign: "center",
+    fontWeight: "600",
+    color: "#5E35B1",
+  },
+  confirmButton: {
+    backgroundColor: "#E6CCE9",
+    paddingVertical: 18,
+    paddingHorizontal: 40,
+    borderRadius: 30,
+    borderWidth: 2,
+    borderColor: "#9575CD",
+    width: "90%",
+    position: "absolute",
+    bottom: Platform.OS === "ios" ? 60 : 40,
+  },
+  confirmButtonText: {
+    fontSize: 18,
+    textAlign: "center",
+    fontWeight: "600",
+    color: "#5E35B1",
   },
 });
