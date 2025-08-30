@@ -7,6 +7,7 @@ import {
   StyleSheet,
   Pressable,
   ScrollView,
+  Platform,
 } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
@@ -139,6 +140,7 @@ const styles = StyleSheet.create({
   bottomBar: {
     paddingHorizontal: 16,
     paddingVertical: 14,
+    marginBottom: Platform.OS === "ios" ? 0 : 30,
   },
   primaryBtn: {
     height: 54,
