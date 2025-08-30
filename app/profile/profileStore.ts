@@ -23,7 +23,7 @@ type ProfileState = {
   setProfile: (patch: Partial<ProfileState>) => void;
   resetProfile: () => void;
 
-  hasHydrated: boolean;         // flag บอกว่าอ่านค่าจาก storage เสร็จแล้ว
+  hasHydrated: boolean; // flag บอกว่าอ่านค่าจาก storage เสร็จแล้ว
   setHasHydrated: (v: boolean) => void;
 };
 
@@ -65,6 +65,6 @@ export const useProfileSecureStore = create<ProfileState>()(
       onRehydrateStorage: () => (state) => {
         state?.setHasHydrated(true); // ตั้งค่าว่าโหลดข้อมูลเสร็จแล้ว
       },
-    }
-  )
+    },
+  ),
 );

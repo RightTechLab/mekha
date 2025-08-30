@@ -14,7 +14,7 @@ import * as Clipboard from "expo-clipboard";
 import { useNwcStore } from "@/lib/State/appStore";
 import * as SecureStore from "expo-secure-store";
 import { useCameraPermissions } from "expo-camera";
-import { Link, router } from "expo-router";
+import { router } from "expo-router";
 
 export default function HeaderIcon() {
   const [isModalVisible, setIsModalVisible] = useState<boolean>(false);

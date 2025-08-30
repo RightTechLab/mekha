@@ -14,12 +14,9 @@ import Feather from "@expo/vector-icons/Feather";
 import { useProfileSecureStore } from "./profileStore";
 
 export default function CustomerProfile() {
-  const profileName = useProfileSecureStore(state => state.profileName)
+  const profileName = useProfileSecureStore((state) => state.profileName);
   const phoneNumber = useProfileSecureStore((state) => state.phoneNumber);
   const lineId = useProfileSecureStore((state) => state.lineId);
-  const paymentCycle = useProfileSecureStore((state) => state.paymentCycle);
-  const firstPaymentDay = useProfileSecureStore((state) => state.firstPaymentDay);
-  const premiumRate = useProfileSecureStore((state) => state.premiumRate);
 
   const onEdit = () => router.push("/profile/edit");
   const onCall = () => console.log("Call");

@@ -1,5 +1,5 @@
 import React from "react";
-import { Pressable, Text, StyleSheet, ViewStyle, Platform } from "react-native";
+import { Pressable, Text, StyleSheet, Platform } from "react-native";
 import { Octicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 

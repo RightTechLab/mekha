@@ -1,4 +1,4 @@
-import { Pressable, SafeAreaView, StyleSheet, Text } from "react-native";
+import { SafeAreaView, StyleSheet } from "react-native";
 
 import TransactionList from "@/components/index/TransactionList";
 

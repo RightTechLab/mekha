@@ -270,7 +270,7 @@ export default function receiveThb() {
       //  NOTE: pay invoice 1 sat
       try {
         if (bolt11) {
-          const paymentResult = await nostrWebLn?.sendPayment(bolt11);
+          await nostrWebLn?.sendPayment(bolt11);
           // console.log("Payment result:", paymentResult);
           await fetchTransactions();
         } else {

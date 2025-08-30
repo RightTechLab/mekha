@@ -1,4 +1,3 @@
-// EditContact.tsx
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   View,
@@ -61,7 +60,6 @@ export default function EditContact() {
 
   return (
     <SafeAreaView style={styles.screen}>
-
       <View style={styles.form}>
         {/* ชื่อ */}
         <View style={styles.field}>
