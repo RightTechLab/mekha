@@ -40,3 +40,5 @@ app-example
 
 ios
 android
+
+*.apk
