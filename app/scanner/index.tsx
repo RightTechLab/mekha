@@ -3,7 +3,8 @@ import { CameraView, useCameraPermissions } from "expo-camera";
 import { Stack, router } from "expo-router";
 import * as SecureStore from "expo-secure-store";
 import React, { useEffect, useRef } from "react";
-import { AppState, Button, Linking, Platform, SafeAreaView, StatusBar, Text } from "react-native";
+import { AppState, Button, Linking, Platform, StatusBar, Text } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function Scanner() {
   const setNwcUrl = useNwcStore((s) => s.setNwcUrl);

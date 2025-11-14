@@ -6,11 +6,11 @@ import {
   Modal,
   Platform,
   Pressable,
-  SafeAreaView,
   StyleSheet,
   Text,
   View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 import AmountDisplay from "@/components/receive/AmountDisplay";
 import Header from "@/components/receive/Header";

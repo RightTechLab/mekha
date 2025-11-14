@@ -1,7 +1,8 @@
 import { useNwcStore } from "@/lib/State/appStore";
 import { Stack } from "expo-router";
-import { SafeAreaView, StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
 import QRCode from "react-native-qrcode-svg";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function QRCodeScreen() {
   const nwcUrl = useNwcStore((state) => state.nwcUrl);
