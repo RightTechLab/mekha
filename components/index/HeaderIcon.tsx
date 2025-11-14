@@ -1,20 +1,20 @@
-import {
-  Text,
-  Modal,
-  View,
-  StyleSheet,
-  Pressable,
-  Platform,
-} from "react-native";
-import { Ionicons, MaterialIcons } from "@expo/vector-icons";
-import { useState } from "react";
-import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
-import Feather from "@expo/vector-icons/Feather";
-import * as Clipboard from "expo-clipboard";
 import { useNwcStore } from "@/lib/State/appStore";
-import * as SecureStore from "expo-secure-store";
+import { Ionicons, MaterialIcons } from "@expo/vector-icons";
+import Feather from "@expo/vector-icons/Feather";
+import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import { useCameraPermissions } from "expo-camera";
+import * as Clipboard from "expo-clipboard";
 import { router } from "expo-router";
+import * as SecureStore from "expo-secure-store";
+import { useState } from "react";
+import {
+  Modal,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 
 export default function HeaderIcon() {
   const [isModalVisible, setIsModalVisible] = useState<boolean>(false);

@@ -1,5 +1,5 @@
 import { useBalanceStore } from "@/lib/State/appStore";
-import { View, Text, StyleSheet } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
 
 interface BalanceCardProps {
   balanceTHB: number;

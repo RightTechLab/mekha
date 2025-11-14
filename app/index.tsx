@@ -1,27 +1,27 @@
 import "@/lib/applyGlobalPolyfills";
+import Feather from "@expo/vector-icons/Feather";
+import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
+import * as Clipboard from "expo-clipboard";
+import { Image } from "expo-image";
+import { router } from "expo-router";
+import * as SecureStore from "expo-secure-store";
+import { useEffect, useState } from "react";
 import {
   Modal,
-  View,
   Pressable,
   SafeAreaView,
   StyleSheet,
   Text,
+  View,
 } from "react-native";
-import { Image } from "expo-image";
-import { useEffect, useState } from "react";
-import { router } from "expo-router";
-import * as SecureStore from "expo-secure-store";
-import * as Clipboard from "expo-clipboard";
-import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
-import Feather from "@expo/vector-icons/Feather";
 
-import HeaderIcon from "@/components/index/HeaderIcon";
 import BalanceCard from "@/components/index/BalanceCard";
-import TransactionList from "@/components/index/TransactionList";
-import { getBitcoinPrice } from "@/lib/getBitcoinPrice";
+import HeaderIcon from "@/components/index/HeaderIcon";
 import ReceiveIcon from "@/components/index/ReceiveIcon";
-import { getSatBalance } from "@/lib/getSatBalance";
+import TransactionList from "@/components/index/TransactionList";
 import { covertSatToThb } from "@/lib/covertSatToThb";
+import { getBitcoinPrice } from "@/lib/getBitcoinPrice";
+import { getSatBalance } from "@/lib/getSatBalance";
 import { useBalanceStore, useNwcStore } from "@/lib/State/appStore";
 import { useCameraPermissions } from "expo-camera";
 

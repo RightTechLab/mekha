@@ -1,7 +1,7 @@
-import React from "react";
-import { Pressable, Text, StyleSheet, Platform } from "react-native";
 import { Octicons } from "@expo/vector-icons";
 import { router } from "expo-router";
+import React from "react";
+import { Platform, Pressable, StyleSheet, Text } from "react-native";
 
 export default function ReceiveIcon() {
   return (

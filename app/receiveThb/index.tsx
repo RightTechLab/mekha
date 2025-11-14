@@ -1,18 +1,18 @@
-import {
-  StyleSheet,
-  SafeAreaView,
-  Platform,
-  Modal,
-  Pressable,
-  View,
-  Text,
-  FlatList,
-} from "react-native";
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { useBalanceStore, useNwcStore } from "@/lib/State/appStore";
-import { webln } from "@getalby/sdk";
 import ActionButton from "@/components/receive/ActionButton";
 import { getTransactionList } from "@/lib/getTransactionList";
+import { useBalanceStore, useNwcStore } from "@/lib/State/appStore";
+import { webln } from "@getalby/sdk";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  FlatList,
+  Modal,
+  Platform,
+  Pressable,
+  SafeAreaView,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 
 interface Transaction {
   amount: number;

@@ -1,13 +1,13 @@
+import { router } from "expo-router";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
-  View,
+  Pressable,
+  SafeAreaView,
+  StyleSheet,
   Text,
   TextInput,
-  Pressable,
-  StyleSheet,
-  SafeAreaView,
+  View,
 } from "react-native";
-import { router } from "expo-router";
 import { useProfileSecureStore } from "./profileStore";
 
 type Form = { name: string; phone: string; lineId: string };
