@@ -1,8 +1,8 @@
-import { FlatList, StyleSheet, Text, View } from "react-native";
-import { useEffect, useMemo, useState } from "react";
-import { getTransactionList } from "@/lib/getTransactionList";
 import TransactionItem from "@/components/index/TransactionItem";
+import { getTransactionList } from "@/lib/getTransactionList";
 import { useNwcStore } from "@/lib/State/appStore";
+import { useEffect, useMemo, useState } from "react";
+import { FlatList, StyleSheet, Text, View } from "react-native";
 
 interface Transaction {
   amount: number;

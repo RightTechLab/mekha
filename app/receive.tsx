@@ -1,21 +1,21 @@
-import {
-  View,
-  SafeAreaView,
-  StyleSheet,
-  Modal,
-  Pressable,
-  Text,
-  ActivityIndicator,
-  Platform,
-} from "react-native";
-import { useState, useEffect } from "react";
 import { webln } from "@getalby/sdk";
 import { router } from "expo-router";
+import { useEffect, useState } from "react";
+import {
+  ActivityIndicator,
+  Modal,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
-import { getBitcoinPrice } from "@/lib/getBitcoinPrice";
-import Header from "@/components/receive/Header";
 import AmountDisplay from "@/components/receive/AmountDisplay";
+import Header from "@/components/receive/Header";
 import QRCodeDisplay from "@/components/receive/QRCodeDisplay";
+import { getBitcoinPrice } from "@/lib/getBitcoinPrice";
 import { useNwcStore } from "@/lib/State/appStore";
 
 export default function Receive() {

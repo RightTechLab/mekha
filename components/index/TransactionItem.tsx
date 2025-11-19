@@ -1,5 +1,5 @@
-import { Pressable, View, Text, StyleSheet } from "react-native";
 import { router } from "expo-router";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 
 interface Transaction {
   amount: number;

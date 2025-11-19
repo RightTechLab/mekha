@@ -1,7 +1,7 @@
-import { View, Text, StyleSheet, Pressable } from "react-native";
-import { useLocalSearchParams } from "expo-router";
-import * as Clipboard from "expo-clipboard";
 import Feather from "@expo/vector-icons/Feather";
+import * as Clipboard from "expo-clipboard";
+import { useLocalSearchParams } from "expo-router";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 
 interface Transaction {
   amount: number;
