@@ -3,17 +3,7 @@ import * as Clipboard from "expo-clipboard";
 import { useLocalSearchParams } from "expo-router";
 import { useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
-import Ionicons from '@expo/vector-icons/Ionicons';
-
-interface Transaction {
-  amount: number;
-  state: string;
-  payment_hash: string;
-  settled_at: number;
-  type: string;
-  description: string;
-  invoice: string;
-}
+import { webln } from "@getalby/sdk";
 
 export default function TransactionDetail() {
   const getAmountFromMemo = (defaultMemo?: string): number => {
@@ -30,7 +20,7 @@ export default function TransactionDetail() {
 
   const [isCopied, setIsCopied] = useState(false);
   const { transaction } = useLocalSearchParams();
-  const parsedTransaction: Transaction = JSON.parse(
+  const parsedTransaction: webln.Transaction = JSON.parse(
     Array.isArray(transaction) ? transaction[0] : transaction || "",
   );
   // console.log("Transaction Detail:", parsedTransaction);

@@ -1,18 +1,10 @@
 import { router } from "expo-router";
 import { Pressable, StyleSheet, Text, View } from "react-native";
-
-interface Transaction {
-  amount: number;
-  state: string;
-  payment_hash: string;
-  settled_at: number;
-  type: string;
-  description: string;
-  invoice: string;
-}
+import { webln } from "@getalby/sdk";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 interface TransactionItemProps {
-  transaction: Transaction;
+  transaction: webln.Transaction;
   amount: number;
 }
 

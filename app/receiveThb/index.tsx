@@ -14,18 +14,8 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-interface Transaction {
-  amount: number;
-  state: string;
-  payment_hash: string;
-  settled_at: number;
-  type: string;
-  description: string;
-  invoice: string;
-}
-
 interface TransactionItemProps {
-  transaction: Transaction;
+  transaction: webln.Transaction;
   amount: number;
 }
 
