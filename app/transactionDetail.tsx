@@ -157,13 +157,4 @@ const styles = StyleSheet.create({
   text: {
     fontSize: 16,
   },
-  buttonCopied: {
-    backgroundColor:"#6750A4",
-    textDecorationColor: "#fff",
-  },
-  button: {
-    backgroundColor:"#fff",
-    borderColor:"#6750A4",
-    textDecorationColor: "#6750A4",
-  },
 });
