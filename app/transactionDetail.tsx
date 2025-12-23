@@ -1,7 +1,9 @@
 import Feather from "@expo/vector-icons/Feather";
 import * as Clipboard from "expo-clipboard";
 import { useLocalSearchParams } from "expo-router";
+import { useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
+import Ionicons from '@expo/vector-icons/Ionicons';
 
 interface Transaction {
   amount: number;
@@ -25,6 +27,8 @@ export default function TransactionDetail() {
     return NaN;
   };
 
+
+  const [isCopied, setIsCopied] = useState(false);
   const { transaction } = useLocalSearchParams();
   const parsedTransaction: Transaction = JSON.parse(
     Array.isArray(transaction) ? transaction[0] : transaction || "",
@@ -35,7 +39,11 @@ export default function TransactionDetail() {
 
   const copyInvoiceToClipboard = async () => {
     await Clipboard.setStringAsync(parsedTransaction.invoice);
-  };
+    setIsCopied(true);
+    setTimeout(() => {setIsCopied(false);}, 500);
+    };
+  
+
 
   return (
     <View style={styles.container}>
@@ -82,7 +90,6 @@ export default function TransactionDetail() {
         <Text style={{ color: "green" }}>ชำระเงินเสร็จสมบูรณ์</Text>
       </View>
 
-      <View style={{ marginBottom: 20 }}></View>
 
       {/* <View style={{ marginBottom: 20 }}> */}
       {/*   <Text style={{ color: "#6750A4", paddingBottom: 5 }}> */}
@@ -104,22 +111,34 @@ export default function TransactionDetail() {
         }}
       >
         <Pressable
-          onPress={copyInvoiceToClipboard}
+          onPress={
+            copyInvoiceToClipboard
+          }
           style={{
             borderRadius: 14,
             borderWidth: 2,
             borderColor: "#6750A4",
+            backgroundColor:isCopied ?"#6750A4":"#fff",
             padding: 8,
           }}
         >
           <View style={{ flexDirection: "row", alignItems: "center" }}>
-            <Feather
+            {isCopied? 
+              <Ionicons 
+              name="checkmark" 
+              size={24} 
+              style={{ paddingRight: 10,color:"#fff" }}
+            />
+             :
+             <Feather
               name="copy"
               size={24}
-              color="#6750A4"
-              style={{ paddingRight: 10 }}
+              style={{ paddingRight: 10,color:"#6750A4" }}
             />
-            <Text style={{ color: "#6750A4" }}>
+            }
+            <Text 
+              style={{color :isCopied ?"#fff":"#6750A4"}}
+            >
               คัดลอกอินวอยซ์ไปยังคลิปบอร์ด
             </Text>
           </View>
