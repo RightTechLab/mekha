@@ -8,6 +8,7 @@ import { router } from "expo-router";
 import * as SecureStore from "expo-secure-store";
 import { useState } from "react";
 import {
+  Alert,
   Modal,
   Platform,
   Pressable,
@@ -43,7 +44,7 @@ export default function HeaderIcon() {
 
       // Validate if the pasted text looks like a valid NWC URL
       if (!text || !text.startsWith("nostr+walletconnect://")) {
-        console.error("Invalid NWC URL format");
+        Alert.alert("Invalid NWC URL format","Please start with nostr+walletconnect://")
         // You might want to show an error message to the user here
         return;
       }
