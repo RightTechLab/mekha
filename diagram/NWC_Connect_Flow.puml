@@ -1,0 +1,88 @@
+@startuml
+title NWC Connect Flow (Check stored, Paste, Scan)
+
+actor User
+participant "Main Screen\n(useEffect)" as Main
+participant "SecureStore" as Secure
+participant "NWC Modal" as Modal
+participant "Clipboard" as Clip
+participant "Camera\nPermission" as CamPerm
+participant "Scanner Screen" as Scanner
+participant "CameraView" as Cam
+participant "Router" as R
+
+== App Launch & Check NWC URL ==
+
+User -> Main: Open App
+activate Main
+Main -> Main: useEffect()\ncheckNwcUrl()
+Main -> Secure: getItemAsync("nwcUrl")
+
+alt nwcUrl exists
+  Secure --> Main: storedNwcUrl
+  Main -> Main: setNwcUrl(storedNwcUrl)\nsetIsModalVisible(false)
+  Main -> User: Show main screen with\nexisting NWC connection
+else nwcUrl not found
+  Secure --> Main: null
+  Main -> Main: setIsModalVisible(true)
+  Main -> User: Show NWC Modal\n("วาง" / "แสกน")
+
+  == Path 1: Paste from Clipboard ==
+
+  group User chooses "วาง"
+    User -> Modal: Tap "วาง"
+    Modal -> Clip: getStringAsync()
+    Clip --> Modal: text
+
+    alt invalid or empty text
+      Modal -> Modal: show "Invalid NWC URL" error\n(text not startsWith "nostr+walletconnect://")
+      Modal -> User: Stay on modal
+    else valid NWC URL
+      Modal -> Main: setNwcUrl(text)
+      Modal -> Secure: setItemAsync("nwcUrl", text)
+      Modal -> Main: onModalClose()\nsetIsModalVisible(false)
+      Main -> User: Show main screen\nwith new NWC connection
+    end
+  end
+
+  == Path 2: Scan QR Code ==
+
+  group User chooses "แสกน"
+    User -> Modal: Tap "แสกน"
+    Modal -> CamPerm: requestPermission()
+    CamPerm --> Modal: permission status
+
+    Modal -> R: router.push("/scanner")
+    Modal -> Main: onModalClose()\nsetIsModalVisible(false)
+    deactivate Main
+
+    R --> Scanner: Show Scanner Screen
+    activate Scanner
+
+    Scanner -> CamPerm: useCameraPermissions()
+
+    alt permission not granted
+      Scanner -> User: Show permission screen\n("ขอสิทธิ์กล้อง")
+      User -> Scanner: Tap "เปิดการตั้งค่า"
+      Scanner -> User: Linking.openSettings()
+    else permission granted
+      Scanner -> User: Show CameraView
+
+      loop On each QR detected
+        Cam -> Scanner: onBarcodeScanned(data)
+
+        alt data startsWith "nostr+walletconnect://" AND !qrLock
+          Scanner -> Scanner: qrLock = true\n(setTimeout 500ms)
+          Scanner -> Main: setNwcUrl(data)
+          Scanner -> Secure: setItemAsync("nwcUrl", data)
+          Scanner -> R: router.replace("/")
+          deactivate Scanner
+        else ignore scan
+          Scanner -> Scanner: ignore or do nothing
+        end
+      end
+    end
+  end
+end
+
+@enduml

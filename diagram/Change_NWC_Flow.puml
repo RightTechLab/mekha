@@ -1,0 +1,74 @@
+@startuml
+title Change NWC URL Flow (Hamburger Menu -> Paste / Scan)
+
+actor User
+participant "Main Screen" as Main
+participant "HeaderIcon\n(Hamburger)" as Header
+participant "NWC Modal" as Modal
+participant "Clipboard" as Clip
+participant "SecureStore" as Secure
+participant "Camera\nPermission" as CamPerm
+participant "Router" as R
+participant "Scanner Screen" as Scanner
+participant "CameraView" as Cam
+
+== Open Menu & Show Modal ==
+
+User -> Header: Tap Hamburger Menu
+Header -> Main: onMenuPress()
+Main -> Main: onModalOpen()\nsetIsModalVisible(true)
+Main -> User: Show NWC Modal\n(ปุ่ม "วาง" และ "แสกน")
+
+== Option 1: Paste (วาง) ==
+
+group User chooses "วาง"
+  User -> Modal: Tap "วาง"\n(onPastePress)
+  Modal -> Clip: Clipboard.getStringAsync()
+  Clip --> Modal: text
+  Modal -> Modal: setCopiedText(text)
+
+  alt text is empty or invalid
+    Modal -> Modal: log "Invalid NWC URL format"
+    Modal -> User: Stay on modal\n(ไม่ปิด Modal)
+  else valid NWC URL\n(startsWith "nostr+walletconnect://")
+    Modal -> Main: setNwcUrl(text)\n(update Zustand state)
+    Modal -> Secure: setItemAsync("nwcUrl", text)
+    Modal -> Main: onModalClose()\nsetIsModalVisible(false)
+    Main -> User: Show main screen\nwith UPDATED NWC URL
+  end
+end
+
+== Option 2: Scan (แสกน) ==
+
+group User chooses "แสกน"
+  User -> Modal: Tap "แสกน"\n(onScanPress)
+  Modal -> CamPerm: requestPermission()
+  CamPerm --> Modal: permission result
+
+  Modal -> R: router.push("/scanner")
+  Modal -> Main: onModalClose()\nsetIsModalVisible(false)
+
+  R --> Scanner: Navigate to Scanner Screen
+  Scanner -> User: Show Scanner UI
+end
+
+group Scanner reads QR and updates NWC URL
+  Scanner -> Cam: Start CameraView\n(barcodeTypes = ["qr"])
+
+  loop On each QR detected
+    Cam -> Scanner: onBarcodeScanned(data)
+
+    alt data startsWith "nostr+walletconnect://" and not locked
+      Scanner -> Scanner: qrLock = true\n(setTimeout 500ms)
+      Scanner -> Main: setNwcUrl(data)
+      Scanner -> Secure: setItemAsync("nwcUrl", data)
+      Scanner -> R: router.replace("/")
+      R --> Main: Back to Main Screen
+      Main -> User: Show main screen\nwith UPDATED NWC URL
+    else invalid QR or locked
+      Scanner -> Scanner: ignore scan
+    end
+  end
+end
+
+@enduml

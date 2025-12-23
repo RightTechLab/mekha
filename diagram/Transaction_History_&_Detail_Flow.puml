@@ -1,0 +1,100 @@
+@startuml
+title View All Transactions & Transaction Detail Flow
+
+actor User
+
+participant "Home Screen" as Home
+participant "Router" as R
+participant "TransactionHistory\nScreen" as THistory
+participant "TransactionList\n(/transactionHistory)" as TxList
+participant "NWC Store\n(Zustand)" as NwcStore
+participant "Tx API\n(getTransactionList)" as TxAPI
+participant "FlatList" as FlatList
+participant "TransactionItem" as TxItem
+participant "TransactionDetail\nScreen" as TDetail
+participant "Clipboard" as Clip
+
+== Navigate to Transaction History ==
+
+User -> Home: Tap "ดูประวัติธุรกรรมทั้งหมด"
+Home -> R: router.push("/transactionHistory")
+R --> THistory: Mount TransactionHistory()
+
+THistory -> TxList: render <TransactionList />
+
+== TransactionList: Fetch Transactions ==
+
+activate TxList
+TxList -> NwcStore: useNwcStore(state => state.nwcUrl)
+NwcStore --> TxList: nwcUrl
+
+TxList -> TxList: useEffect([nwcUrl])\nfetchTransactions()
+
+alt nwcUrl is NOT available
+  TxList -> TxList: setLoading(false)
+  TxList -> User: ListEmptyComponent:\n"Waiting for wallet connection..."
+else nwcUrl exists
+  TxList -> TxList: setLoading(true)\nsetError(null)
+  TxList -> TxAPI: getTransactionList(nwcUrl)
+  TxAPI --> TxList: transactionList[]
+
+  TxList -> TxList: setTransactions(transactionList)
+
+  note over TxList
+    useMemo filteredTransactions =
+    transactions.filter(item => item.amount > 1)
+
+    getAmountFromMemo(description):
+      - split by ","
+      - parseFloat(parts[0])
+
+    getDisplayAmount(item):
+      - try amount from memo
+      - fallback to item.amount
+  end note
+
+  TxList -> FlatList: render filteredTransactions\nwith <TransactionItem />
+end
+deactivate TxList
+
+== Render List & Select One Transaction ==
+
+loop for each item in filteredTransactions
+  FlatList -> TxItem: render TransactionItem\n(transaction, amount)
+end
+
+User -> TxItem: Tap a transaction row\n(onPress)
+
+TxItem -> R: router.push("/transactionDetail",\n params: { transaction: JSON.stringify(transaction) })
+
+== TransactionDetail Screen ==
+
+R --> TDetail: Mount TransactionDetail()
+
+activate TDetail
+TDetail -> TDetail: useLocalSearchParams()\nget `transaction` param
+TDetail -> TDetail: JSON.parse(transaction)\n=> parsedTransaction
+
+TDetail -> TDetail: getAmountFromMemo(parsedTransaction.description)\n=> amount (THB)
+
+TDetail -> User: Show detail
+note over TDetail
+  แสดงข้อมูล:
+  - ประเภท: "รับชำระเงินผ่านไลต์นิงเน็ตเวิร์ก"
+  - เวลา: toLocaleDateString/TimeString (th-TH)
+  - มูลค่า: amount.toFixed(2) บาท
+  - จำนวน: parsedTransaction.amount (ซาโตชิ)
+  - สถานะ: "ชำระเงินเสร็จสมบูรณ์"
+  - อินวอยซ์: parsedTransaction.invoice
+end note
+
+== Copy Invoice to Clipboard ==
+
+User -> TDetail: Tap "คัดลอกอินวอยซ์ไปยังคลิปบอร์ด"
+TDetail -> Clip: Clipboard.setStringAsync(parsedTransaction.invoice)
+Clip --> TDetail: (done)
+TDetail -> User: (อาจจะแสดง toast / feedback ใน UI ถ้าเพิ่มภายหลัง)
+
+deactivate TDetail
+
+@enduml
