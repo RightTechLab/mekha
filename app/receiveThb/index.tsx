@@ -1,4 +1,5 @@
 import ActionButton from "@/components/receive/ActionButton";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { getTransactionList } from "@/lib/getTransactionList";
 import { useBalanceStore, useNwcStore } from "@/lib/State/appStore";
 import { webln } from "@getalby/sdk";
@@ -12,7 +13,6 @@ import {
   Text,
   View,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
 
 interface TransactionItemProps {
   transaction: webln.Transaction;
@@ -129,25 +129,22 @@ export default function receiveThb() {
   };
 
   const filteredTransactions = useMemo(() => {
-    const filltered = transactions.filter(
+    return transactions.filter(
       (item) =>
         item.amount === 1 &&
         item.type === "incoming" &&
         !Number.isNaN(getAmountFromMemo(item.description)),
     );
+  }, [transactions]);
 
-    const totalThb = filltered.reduce((sum, item) => {
+  useEffect(() => {
+    const totalThb = filteredTransactions.reduce((sum, item) => {
       sum -= getAmountFromMemo(item.description);
       return sum;
     }, 0);
 
-    const updateBalance = () => {
-      setAllThbReceive(totalThb);
-    };
-    updateBalance();
-
-    return filltered;
-  }, [transactions, setAllThbReceive]);
+    setAllThbReceive(totalThb);
+  }, [filteredTransactions, setAllThbReceive]);
 
   const renderEmptyComponent = () => {
     if (loading) {
@@ -319,7 +316,7 @@ export default function receiveThb() {
           borderRadius: 30,
           borderWidth: 2,
           borderColor: "#9575CD",
-          bottom: 30,
+          marginBottom: 30,
           marginHorizontal: 20,
         }}
       >
@@ -376,13 +373,14 @@ export default function receiveThb() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#fff",
-    marginHorizontal: 20,
+    backgroundColor: "rgba(255, 255, 255, 0)",
+    marginHorizontal: 40,
+    marginBottom: 40,
   },
   balanceCard: {
-    marginTop: 30,
+    marginTop: 0,
     marginHorizontal: 20,
-    padding: 18,
+    padding: 9,
     alignItems: "center",
     justifyContent: "center",
     marginBottom: 20,
@@ -450,7 +448,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: 80,
+    marginBottom: 20,
   },
   amountText: {
     color: "#4B3885", // Dark text for light mode
@@ -553,7 +551,9 @@ const styles = StyleSheet.create({
   },
   transactionItem: {
     backgroundColor: "#e7ddfd",
-    padding: 16,
+    paddingLeft: 16,
+    paddingRight: 32,
+    paddingVertical: 16,
     marginBottom: 8,
     borderRadius: 10,
   },
