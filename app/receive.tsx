@@ -130,10 +130,7 @@ export default function Receive() {
     setIsModalVisible(true);
   };
 
-  const getButtonTitle = () => {
-    return amount === 0 ? "ระบุยอดเงิน" : "แก้ไขยอดเงิน";
-  };
-
+  
   const handleNumberPress = (number: string) => {
     // console.log("Pressed:", number, "Type:", typeof number); // Debug log
     setInputAmount((prev) => {
@@ -201,15 +198,16 @@ export default function Receive() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['bottom', 'left', 'right']}>
       <View style={styles.innerContainer}>
         <Header title="Bitcoin Lightning Network" />
-
-        <AmountDisplay
-          amount={amount}
-          satsAmount={convertThbToSats(amount)}
-          isLoading={isLoading}
-        />
+         <Pressable onPress={handleAmountChange} >
+          <AmountDisplay
+            amount={amount}
+            satsAmount={convertThbToSats(amount)}
+            isLoading={isLoading}
+          />
+        </Pressable>
 
         {loading && !invoice && (
           <View style={styles.loadingContainer}>
@@ -220,9 +218,6 @@ export default function Receive() {
 
         {invoice && <QRCodeDisplay value={invoice} />}
 
-        <Pressable onPress={handleAmountChange} style={styles.editButton}>
-          <Text style={styles.editButtonText}>{getButtonTitle()}</Text>
-        </Pressable>
 
         {showSuccessScreen && (
           <View style={styles.successOverlay}>
@@ -255,9 +250,9 @@ export default function Receive() {
                 </Pressable>
               </View>
               <View style={styles.amountRow}>
-                <Text style={styles.amountText}>
-                  ฿ {formatWithCommas(inputAmount)}
-                </Text>
+                    <Text style={styles.amountText}>
+                      ฿ {formatWithCommas(inputAmount)}
+                    </Text>
                 <Text style={styles.currencyText}>THB</Text>
               </View>
               <View style={styles.divider} />
@@ -314,8 +309,8 @@ export default function Receive() {
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
-    backgroundColor: "#ffffff", // Light mode background
+    flex: 1, 
+    backgroundColor: "#fff"// Light mode background
   },
   innerContainer: {
     flex: 1,
