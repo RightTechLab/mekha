@@ -502,9 +502,6 @@ const styles = StyleSheet.create({
     // Default styles for the container
     alignItems: "center",
     justifyContent: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 5,
   },
   qrContainerNormal: {
     backgroundColor: "#fff",

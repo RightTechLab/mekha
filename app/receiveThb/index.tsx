@@ -73,7 +73,7 @@ function TransactionItem({ transaction, amount }: TransactionItemProps) {
   );
 }
 
-export default function receiveThb() {
+export default function ReceiveThb() {
   const nwcUrl = useNwcStore((state) => state.nwcUrl);
   const allThbReceive = useBalanceStore((state) => state.allThbReceive);
   const setAllThbReceive = useBalanceStore((state) => state.setAllThbReceive);
@@ -231,10 +231,10 @@ export default function receiveThb() {
     setIsModalVisible(true);
   };
 
-  const createNwcClient = async () => {
+  const createNwcClient = useCallback(async () => {
     try {
       const nostrWebLn = new webln.NostrWebLNProvider({
-        nostrWalletConnectUrl: nwcUrl,
+        nostrWalletConnectUrl: nwcUrl, // ใช้ nwcUrl ที่นี่
       });
       await nostrWebLn.enable();
       setNostrWebLn(nostrWebLn);
@@ -243,11 +243,12 @@ export default function receiveThb() {
       console.error("Error creating NWC client:", error);
       throw error;
     }
-  };
+  }, [nwcUrl]);
 
-  const createTransaction1Sat = async () => {
+  const createTransaction1Sat = useCallback(async () => {
     //  NOTE: create invoice 1 sat
     try {
+      // ใช้ nostrWebLn และ amount ที่นี่
       const invoice = await nostrWebLn?.makeInvoice({
         amount: 1,
         defaultMemo: `-${amount.toFixed(2)}`,
@@ -257,8 +258,11 @@ export default function receiveThb() {
       //  NOTE: pay invoice 1 sat
       try {
         if (bolt11) {
+          // ใช้ nostrWebLn อีกครั้ง
           await nostrWebLn?.sendPayment(bolt11);
           // console.log("Payment result:", paymentResult);
+
+          // เรียกใช้ฟังก์ชัน fetchTransactions
           await fetchTransactions();
         } else {
           console.error("No bolt11 invoice generated");
@@ -269,17 +273,17 @@ export default function receiveThb() {
     } catch (error) {
       console.error("Error creating invoice:", error);
     }
-  };
+  }, [nostrWebLn, amount, fetchTransactions]); // <--- ใส่ให้ครบตามที่ฟังก์ชันเรียกใช้
 
   useEffect(() => {
-    createNwcClient();
-  }, [nwcUrl]);
-
-  useEffect(() => {
-    if (amount > 0) {
-      createTransaction1Sat();
+    if (nwcUrl) {
+      createNwcClient();
     }
-  }, [amount, nwcUrl]);
+  }, [createNwcClient, nwcUrl]);
+
+  useEffect(() => {
+    createTransaction1Sat();
+  }, [createTransaction1Sat]);
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: "#fff" }}>
