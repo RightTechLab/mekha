@@ -1,0 +1,102 @@
+@startuml
+title Bitcoin Payment Flow (Receive THB -> LN Invoice -> Pay -> Success)
+
+actor "Merchant\n(ผู้ใช้แอป)" as User
+actor "Customer Wallet\n(กระเป๋าลูกค้า)" as Cust
+
+participant "Main Screen" as Main
+participant "ReceiveIcon" as ReceiveIcon
+participant "Router" as R
+participant "Receive Screen\n(Receive())" as Receive
+participant "Amount Modal\n(isModalVisible)" as Modal
+participant "Bitcoin Price API\n(getBitcoinPrice)" as PriceAPI
+participant "NostrWebLNProvider" as WebLN
+participant "QRCodeDisplay\n(Invoice QR)" as QR
+participant "Polling Timer" as Timer
+
+== From Main Screen to Receive Screen ==
+
+User -> Main: ดูหน้าหลัก
+Main -> ReceiveIcon: render <ReceiveIcon />
+User -> ReceiveIcon: Tap "รับเงิน"
+ReceiveIcon -> R: router.push("/receive")
+R --> Receive: Mount Receive()
+
+== Initial Load & Show POS Modal ==
+
+activate Receive
+Receive -> PriceAPI: getBitcoinPrice()
+PriceAPI --> Receive: THB/BTC price\n(setBitcoinPriceThb)
+Receive -> Receive: setIsModalVisible(true)
+Receive -> User: Show Amount Modal\n(ให้ใส่จำนวนเงินบาท)
+
+== Enter Amount & Set Amount ==
+
+group ใส่จำนวนเงินผ่าน Keypad
+  loop กดเลข/จุด/ลบ
+    User -> Modal: กดปุ่มตัวเลข / "." / "⌫"
+    Modal -> Receive: handleNumberPress()/handleDelet()\nupdate inputAmount
+    Receive -> Modal: แสดงตัวเลขใหม่\n(THB + SAT แปลงจาก convertThbToSats)
+  end
+end
+
+User -> Modal: Tap "Set Amount"
+Modal -> Receive: handleSetAmount()\nsetAmount(parseFloat(inputAmount))\nsetIsModalVisible(false)
+Receive -> User: ปิด Modal, แสดงยอด THB + sat\nที่หัวหน้า Receive page
+
+== Create Invoice & Show QR ==
+
+alt amount > 0 AND nwcUrl มีค่า
+  Receive -> Receive: useEffect([amount, nwcUrl])\ncreateInvoice()
+  Receive -> Receive: setLoading(true)\nsetError(null)\nsetInvoice(null)
+
+  Receive -> WebLN: new NostrWebLNProvider(nwcUrl)\n& enable()
+  WebLN --> Receive: enable() success
+
+  Receive -> WebLN: makeInvoice(amountInSats,\n defaultMemo = THB amount)
+  WebLN --> Receive: paymentRequest (invoice)
+  Receive -> Receive: setInvoice(paymentRequest)\nsetLoading(false)
+
+  Receive -> QR: render QR Code\n(value = invoice)
+  Receive -> User: แสดง QR ให้ลูกค้าสแกนจ่าย
+else amount <= 0
+  Receive -> Receive: setError("Amount must be greater than zero")
+  Receive -> User: แจ้ง Error / ไม่สร้าง QR
+end
+
+== Customer Pays Invoice ==
+
+Cust -> QR: Scan LN Invoice QR
+Cust -> WebLN: Pay invoice\n(paymentRequest)
+
+== Poll Invoice Status ==
+
+group Poll every 2s (maxAttempts)
+  Receive -> Timer: setInterval(2000ms)
+  loop ทุก ๆ 2 วินาที
+    Timer -> WebLN: lookupInvoice(paymentRequest)
+    
+    alt paid == true
+      WebLN --> Receive: { paid: true }
+      Receive -> Receive: setPaymentStatus("paid")\nsetShowSuccessScreen(true)
+      Receive -> User: Show "การชำระเงินสำเร็จ!"\nพร้อมยอด THB และ sats
+
+      ... หลังจาก 3 วินาที ...
+      Receive -> R: router.replace("/")
+      R --> Main: กลับไปหน้าหลัก
+      break
+    else ยังไม่จ่าย
+      WebLN --> Receive: { paid: false }
+      Receive -> Receive: setPaymentStatus("pending")
+      Receive -> User: ยังแสดง QR เดิมต่อไป
+    end
+  end
+end
+
+== Edit Amount (Change Price) ==
+
+User -> Receive: Tap ปุ่ม "ระบุยอดเงิน" / "แก้ไขยอดเงิน"
+Receive -> Receive: setIsModalVisible(true)
+Receive -> User: เปิด Amount Modal อีกครั้ง\n(วน flow ตั้งแต่ Enter Amount ใหม่\nและสร้าง invoice ใหม่)
+
+@enduml

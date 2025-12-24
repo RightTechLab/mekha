@@ -3,19 +3,10 @@ import { getTransactionList } from "@/lib/getTransactionList";
 import { useNwcStore } from "@/lib/State/appStore";
 import { useEffect, useMemo, useState } from "react";
 import { FlatList, StyleSheet, Text, View } from "react-native";
-
-interface Transaction {
-  amount: number;
-  state: string;
-  payment_hash: string;
-  settled_at: number;
-  type: string;
-  description: string;
-  invoice: string;
-}
+import { webln } from "@getalby/sdk";
 
 export default function TransactionList() {
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [transactions, setTransactions] = useState<webln.Transaction[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -59,7 +50,7 @@ export default function TransactionList() {
   };
 
   // ฟังก์ชันใช้หา amount ที่จะแสดง (แปลงจาก memo ไม่ได้ -> ใช้ item.amount)
-  const getDisplayAmount = (item: Transaction) => {
+  const getDisplayAmount = (item: webln.Transaction) => {
     const fromMemo = getAmountFromMemo(item.description);
     return Number.isFinite(fromMemo) ? fromMemo : item.amount;
   };

@@ -1,0 +1,118 @@
+@startuml
+title Record Received THB After Bitcoin Payment
+
+actor "Merchant\n(แม่ค้า)" as User
+
+participant "Home Screen" as Home
+participant "BalanceCard\n(ยอดเงิน)" as BCard
+participant "Router" as R
+participant "Receive THB Screen\n(receiveThb())" as RThb
+participant "NWC Store\n(Zustand)" as NwcStore
+participant "WebLN NWC Client\nNostrWebLNProvider" as WebLN
+participant "Tx API\n(getTransactionList)" as TxAPI
+participant "Balance Store\n(useBalanceStore)" as BalStore
+participant "SecureStore\n(allThbReceive)" as SecureBal
+participant "Filtered Tx List\n(useMemo)" as FList
+participant "TransactionItem" as TxItem
+participant "Modal\n(Enter Amount)" as Modal
+
+== 1. จากหน้าแรก -> หน้าบันทึกเงินบาทที่ได้รับ ==
+
+User -> BCard: Tap BalanceCard\n(เช่น: "ยอดเงิน")
+BCard -> R: router.push("/receiveThb")
+R --> RThb: Mount receiveThb()
+
+== 2. Initial setup & โหลดธุรกรรมเดิม ==
+
+RThb -> NwcStore: useNwcStore(state => state.nwcUrl)
+NwcStore --> RThb: nwcUrl
+
+RThb -> RThb: useEffect([nwcUrl])\ncreateNwcClient()
+RThb -> WebLN: new NostrWebLNProvider({ nostrWalletConnectUrl: nwcUrl })\n& enable()
+WebLN --> RThb: client ready\n(setNostrWebLn)
+
+RThb -> RThb: useEffect([fetchTransactions])\nfetchTransactions()
+RThb -> TxAPI: getTransactionList(nwcUrl)
+TxAPI --> RThb: transactions[]
+
+RThb -> BalStore: useBalanceStore(state => { allThbReceive, setAllThbReceive })
+
+== 3. Filter 1-sat marker & คำนวณ allThbReceive ==
+
+RThb -> FList: useMemo(filteredTransactions)
+
+note over RThb,FList
+  filteredTransactions = transactions.filter(
+    item.amount === 1 &&
+    item.type === "incoming" &&
+    !Number.isNaN(getAmountFromMemo(item.description))
+  )
+
+  getAmountFromMemo(description):
+    - split(",")
+    - parts[0] = THB string (เช่น "-150.00")
+    - parseFloat(parts[0])
+
+  totalThb = filtered.reduce((sum, item) => {
+    sum -= getAmountFromMemo(item.description);
+    return sum;
+  }, 0)
+
+  setAllThbReceive(totalThb)
+end note
+
+BalStore -> SecureBal: setItemAsync(ALL_THB_RECEIVE_STORAGE_KEY,\n totalThb)
+
+RThb -> User: Show card "ยอดเงินบาทที่ได้รับ"\n฿ {allThbReceive}
+
+loop Render filteredTransactions
+  FList -> TxItem: render(transaction, amountFromMemo)
+  TxItem -> User: แสดงวันเวลา +\n{type ? "+" : "-"}฿{-amount.toFixed(2)}
+end
+
+== 4. แม่ค้ากดบันทึกว่า "ได้รับเงินบาทแล้ว" ==
+
+User -> RThb: Tap button "ได้รับเงินบาทแล้ว"
+RThb -> Modal: setIsModalVisible(true)\nshow keypad modal
+
+group กรอกจำนวนเงินบาทที่ได้รับ
+  loop keypad Input
+    User -> Modal: Press number / "." / "⌫"
+    Modal -> RThb: handleNumberPress()/handleDelet()\nupdate inputAmount
+    RThb -> Modal: แสดง "฿ {formatWithCommas(inputAmount)}"
+  end
+end
+
+User -> Modal: Tap "Receive Amount"
+Modal -> RThb: handleSetAmount()
+RThb -> RThb: amount = parseFloat(inputAmount)\nsetIsModalVisible(false)
+
+== 5. สร้าง 1 sat self-payment (บันทึก THB) ==
+
+RThb -> RThb: useEffect([amount, nwcUrl])\nif (amount > 0)\n  createTransaction1Sat()
+
+RThb -> WebLN: makeInvoice({ amount:1,\n  defaultMemo:`-${amount.toFixed(2)}` })
+WebLN --> RThb: { paymentRequest: bolt11 }
+
+RThb -> WebLN: sendPayment(bolt11)\n(จ่าย 1 sat ให้ตัวเอง)
+
+RThb -> RThb: await fetchTransactions()
+RThb -> TxAPI: getTransactionList(nwcUrl)
+TxAPI --> RThb: updated transactions[]
+
+== 6. Recompute allThbReceive & อัปเดตหน้าจอ ==
+
+RThb -> FList: useMemo(filteredTransactions) recompute
+RThb -> BalStore: setAllThbReceive(newTotalThb)
+BalStore -> SecureBal: save newTotalThb
+
+RThb -> User: Update UI
+note over User,RThb
+  - Card "ยอดเงินบาทที่ได้รับ" แสดงยอดรวมใหม่
+  - รายการ 1 sat transaction ตัวล่าสุดถูกเพิ่มใน list
+  - Home Screen จะใช้ allThbReceive
+    ไปหักออกจาก balanceTHB (adjustedBalance)
+    เพื่อให้เห็น net balance หลัง "รับเป็นเงินบาทแล้ว"
+end note
+
+@enduml
