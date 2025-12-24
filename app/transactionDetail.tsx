@@ -4,6 +4,7 @@ import { useLocalSearchParams } from "expo-router";
 import { useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { webln } from "@getalby/sdk";
+import Ionicons from "@expo/vector-icons/Ionicons";
 
 export default function TransactionDetail() {
   const getAmountFromMemo = (defaultMemo?: string): number => {
@@ -30,7 +31,6 @@ export default function TransactionDetail() {
   const copyInvoiceToClipboard = async () => {
     await Clipboard.setStringAsync(parsedTransaction.invoice);
     setIsCopied(true);
-    setTimeout(() => {setIsCopied(false);}, 500);
     };
   
 
@@ -101,6 +101,8 @@ export default function TransactionDetail() {
         }}
       >
         <Pressable
+          onPressIn={() => {setIsCopied(true)}}
+          onPressOut={() => {setIsCopied(false)}}
           onPress={
             copyInvoiceToClipboard
           }

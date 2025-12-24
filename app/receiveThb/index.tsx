@@ -5,6 +5,8 @@ import { useBalanceStore, useNwcStore } from "@/lib/State/appStore";
 import { webln } from "@getalby/sdk";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
+  ActivityIndicator,
+  Alert,
   FlatList,
   Modal,
   Platform,
@@ -20,6 +22,8 @@ interface TransactionItemProps {
 }
 
 function TransactionItem({ transaction, amount }: TransactionItemProps) {
+  const displayAmount = Math.abs(amount).toFixed(2);
+
   return (
     <View style={styles.transactionItem}>
       <View
@@ -49,23 +53,16 @@ function TransactionItem({ transaction, amount }: TransactionItemProps) {
               },
             )}
           </Text>
-
-          {/* <Text style={styles.amount}> */}
-          {/*   {transaction.type === "incoming" ? "+" : "-"} */}
-          {/*   {transaction.amount.toLocaleString()} sat */}
-          {/* </Text> */}
-
-          {/* NOTE: use for see transaction description  */}
-          {/* <Text>{transaction.description}</Text> */}
         </View>
         <View>
           <Text
             style={{
-              color: transaction.type === "incoming" ? "green" : "red",
+              // สีเขียวเสมอเพราะหน้านี้คือ Receive (ได้รับเงินบาท)
+              color: "green",
               fontSize: 20,
             }}
           >
-            {transaction.type === "incoming" ? "+" : "-"}฿{-amount.toFixed(2)}
+            +฿{displayAmount}
           </Text>
         </View>
       </View>
@@ -78,35 +75,49 @@ export default function ReceiveThb() {
   const allThbReceive = useBalanceStore((state) => state.allThbReceive);
   const setAllThbReceive = useBalanceStore((state) => state.setAllThbReceive);
 
-  const [nostrWebLn, setNostrWebLn] =
-    useState<webln.NostrWebLNProvider | null>();
+  const [nostrWebLn, setNostrWebLn] = useState<webln.NostrWebLNProvider | null>(
+    null,
+  );
   const [isModalVisible, setIsModalVisible] = useState<boolean>(false);
   const [inputAmount, setInputAmount] = useState<string>("0");
-  const [amount, setAmount] = useState<number>(0);
+
   const [transactions, setTransactions] = useState<webln.Transaction[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
+  const [isProcessingPayment, setIsProcessingPayment] =
+    useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
-  // const [allThbReceive, setAllThbReceive] = useState<number>(0);
 
+  // 1. Setup NWC Connection
+  useEffect(() => {
+    const initNwc = async () => {
+      if (nwcUrl) {
+        try {
+          const provider = new webln.NostrWebLNProvider({
+            nostrWalletConnectUrl: nwcUrl,
+          });
+          await provider.enable();
+          setNostrWebLn(provider);
+        } catch (error) {
+          console.error("Error creating NWC client:", error);
+        }
+      }
+    };
+    initNwc();
+  }, [nwcUrl]);
+
+  // 2. Fetch Transactions
   const fetchTransactions = useCallback(async () => {
-    // Don't fetch if nwcUrl is not available yet
     if (!nwcUrl) {
-      // console.log("NWC URL not available yet, skipping transaction fetch");
       setLoading(false);
       return;
     }
-
     try {
       setLoading(true);
       setError(null);
-      // console.log("Fetching transactions with NWC URL:", nwcUrl);
-
       const transactionList = await getTransactionList(nwcUrl);
-      // console.log("Fetched transactions:", transactionList);
       setTransactions(transactionList);
     } catch (err) {
       console.error("Error fetching transaction list:", err);
-      console.log("Failed to fetch transactions. Please try again.", err);
       setError("Failed to load transactions");
     } finally {
       setLoading(false);
@@ -115,17 +126,15 @@ export default function ReceiveThb() {
 
   useEffect(() => {
     fetchTransactions();
-  }, [fetchTransactions]); // Add nwcUrl as dependency
+  }, [fetchTransactions]);
 
+  // Helper Functions
   const getAmountFromMemo = (defaultMemo?: string): number => {
     if (!defaultMemo) return NaN;
     const parts = defaultMemo.split(",");
-    if (parts.length >= 1) {
-      const pricePart = parts[0].trim(); // <-- amount อยู่ index 0
-      const price = parseFloat(pricePart);
-      return isNaN(price) ? NaN : price;
-    }
-    return NaN;
+    const pricePart = parts[0].trim();
+    const price = parseFloat(pricePart);
+    return isNaN(price) ? NaN : price;
   };
 
   const filteredTransactions = useMemo(() => {
@@ -139,190 +148,135 @@ export default function ReceiveThb() {
 
   useEffect(() => {
     const totalThb = filteredTransactions.reduce((sum, item) => {
-      sum -= getAmountFromMemo(item.description);
+      sum += Math.abs(getAmountFromMemo(item.description));
       return sum;
     }, 0);
-
     setAllThbReceive(totalThb);
   }, [filteredTransactions, setAllThbReceive]);
 
-  const renderEmptyComponent = () => {
-    if (loading) {
-      return <Text style={styles.emptyText}>Loading transactions...</Text>;
+  const handleConfirmTransaction = async () => {
+    const thbAmount = parseFloat(inputAmount.replace(/,/g, ""));
+
+    if (!thbAmount || thbAmount <= 0) {
+      Alert.alert("Error", "Please enter a valid amount");
+      return;
     }
-    if (error) {
-      return <Text style={styles.errorText}>{error}</Text>;
+
+    if (!nostrWebLn) {
+      Alert.alert("Error", "Wallet not connected");
+      return;
     }
-    if (!nwcUrl) {
-      return (
-        <Text style={styles.emptyText}>Waiting for wallet connection...</Text>
-      );
+
+    try {
+      setIsProcessingPayment(true);
+
+      // A. สร้าง Invoice 1 sat โดยใส่ Memo เป็นค่าเงินบาท (ติดลบเพื่อให้รู้ว่าเป็นรายการรับ หรือตาม format เดิม)
+      // Memo: "-100.50"
+      const invoice = await nostrWebLn.makeInvoice({
+        amount: 1,
+        defaultMemo: `-${thbAmount.toFixed(2)}`,
+      });
+
+      const bolt11 = invoice?.paymentRequest;
+
+      // B. จ่าย Invoice ทันที (Self-payment เพื่อบันทึกลง Ledger)
+      if (bolt11) {
+        await nostrWebLn.sendPayment(bolt11);
+
+        // C. จ่ายเสร็จแล้ว -> รีเฟรชรายการ
+        await fetchTransactions();
+
+        // D. Reset และปิด Modal
+        setInputAmount("0");
+        setIsModalVisible(false);
+      } else {
+        Alert.alert("Error", "Failed to generate invoice");
+      }
+    } catch (error) {
+      console.error("Payment failed:", error);
+      Alert.alert("Error", "Transaction failed. Please try again.");
+    } finally {
+      setIsProcessingPayment(false);
     }
-    return <Text style={styles.emptyText}>No transactions found</Text>;
   };
 
-  const handleSetAmount = () => {
-    setAmount(parseFloat(inputAmount.replace(/,/g, "")) || 0);
-    setIsModalVisible(false);
-  };
-
+  // UI Handlers
   const handleDelet = () => {
     setInputAmount((prev) => {
-      if (prev.length <= 1) return "0"; // If only one digit or "0", reset to "0"
-      return prev.slice(0, -1); // Remove the last character
+      if (prev.length <= 1) return "0";
+      return prev.slice(0, -1);
     });
   };
 
   const handleNumberPress = (number: string) => {
-    // console.log("Pressed:", number, "Type:", typeof number); // Debug log
     setInputAmount((prev) => {
-      // console.log("Previous:", prev, "Adding:", number); // Debug log
-
-      if (number === "." && prev.includes(".")) {
-        // console.log("Decimal already exists, skipping");
-        return prev;
-      }
-
+      if (number === "." && prev.includes(".")) return prev;
       if (prev.includes(".") && number !== ".") {
         const decimalPart = prev.split(".")[1];
-        if (decimalPart && decimalPart.length >= 2) {
-          // console.log("Max decimal places reached");
-          return prev;
-        }
+        if (decimalPart && decimalPart.length >= 2) return prev;
       }
-
-      if (prev === "0" && number !== ".") {
-        // console.log("Replacing 0 with", number);
-        return number;
-      }
-
-      const newValue = prev + number;
-      // console.log("New value:", newValue);
-      return newValue;
+      if (prev === "0" && number !== ".") return number;
+      return prev + number;
     });
   };
 
   const formatWithCommas = (value: string): string => {
-    if (!value || value === "") return "0";
-
+    if (!value) return "0";
     const cleanValue = value.replace(/,/g, "");
-
-    // Split by decimal point
     const parts = cleanValue.split(".");
     const integerPart = parts[0] || "0";
     const decimalPart = parts[1];
-
-    // Format integer part with commas
     const formattedInteger = parseInt(integerPart).toLocaleString("en-US");
 
-    // Reconstruct the number
-    if (parts.length === 1) {
-      return formattedInteger;
-    } else if (decimalPart === undefined || decimalPart === "") {
-      // User typed "1." - show "1."
-      return formattedInteger + ".";
-    } else {
-      // User typed "1.23" - show "1.23"
-      return formattedInteger + "." + decimalPart;
-    }
+    if (parts.length === 1) return formattedInteger;
+    return formattedInteger + "." + (decimalPart || "");
   };
 
-  const onModalOpen = () => {
-    setIsModalVisible(true);
+  const renderEmptyComponent = () => {
+    if (loading)
+      return <Text style={styles.emptyText}>Loading transactions...</Text>;
+    if (error) return <Text style={styles.errorText}>{error}</Text>;
+    if (!nwcUrl)
+      return (
+        <Text style={styles.emptyText}>Waiting for wallet connection...</Text>
+      );
+    return <Text style={styles.emptyText}>No transactions found</Text>;
   };
-
-  const createNwcClient = useCallback(async () => {
-    try {
-      const nostrWebLn = new webln.NostrWebLNProvider({
-        nostrWalletConnectUrl: nwcUrl, // ใช้ nwcUrl ที่นี่
-      });
-      await nostrWebLn.enable();
-      setNostrWebLn(nostrWebLn);
-      // console.log("WebLN provider initialized with NWC URL:", nostrWebLn);
-    } catch (error) {
-      console.error("Error creating NWC client:", error);
-      throw error;
-    }
-  }, [nwcUrl]);
-
-  const createTransaction1Sat = useCallback(async () => {
-    //  NOTE: create invoice 1 sat
-    try {
-      // ใช้ nostrWebLn และ amount ที่นี่
-      const invoice = await nostrWebLn?.makeInvoice({
-        amount: 1,
-        defaultMemo: `-${amount.toFixed(2)}`,
-      });
-      const bolt11 = invoice?.paymentRequest.trim();
-
-      //  NOTE: pay invoice 1 sat
-      try {
-        if (bolt11) {
-          // ใช้ nostrWebLn อีกครั้ง
-          await nostrWebLn?.sendPayment(bolt11);
-          // console.log("Payment result:", paymentResult);
-
-          // เรียกใช้ฟังก์ชัน fetchTransactions
-          await fetchTransactions();
-        } else {
-          console.error("No bolt11 invoice generated");
-        }
-      } catch (error) {
-        console.error("Error sending payment:", error);
-      }
-    } catch (error) {
-      console.error("Error creating invoice:", error);
-    }
-  }, [nostrWebLn, amount, fetchTransactions]); // <--- ใส่ให้ครบตามที่ฟังก์ชันเรียกใช้
-
-  useEffect(() => {
-    if (nwcUrl) {
-      createNwcClient();
-    }
-  }, [createNwcClient, nwcUrl]);
-
-  useEffect(() => {
-    createTransaction1Sat();
-  }, [createTransaction1Sat]);
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: "#fff" }}>
       <View style={styles.balanceCard}>
         <Text style={styles.balanceLabel}>ยอดเงินบาทที่ได้รับ</Text>
-        <Text style={styles.balanceAmountTHB}>฿ {allThbReceive}</Text>
+        <Text style={styles.balanceAmountTHB}>
+          ฿{" "}
+          {allThbReceive.toLocaleString(undefined, {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2,
+          })}
+        </Text>
       </View>
 
-      {/* Trasaction List */}
       <View style={styles.container}>
         <FlatList
           data={filteredTransactions}
-          // data={transactions}
           renderItem={({ item }) => (
             <TransactionItem
               transaction={item}
-              // amount={getAmountFromMemo(item.description)}
               amount={getAmountFromMemo(item.description)}
             />
           )}
-          keyExtractor={(item, index) => `${item.payment_hash}-${index}`}
+          keyExtractor={(item) => item.payment_hash}
           style={styles.flatList}
           ListEmptyComponent={renderEmptyComponent}
           showsVerticalScrollIndicator={false}
+          refreshing={loading}
+          onRefresh={fetchTransactions}
         />
       </View>
 
       <Pressable
-        onPress={onModalOpen}
-        style={{
-          backgroundColor: "#E6CCE9",
-          paddingVertical: 18,
-          paddingHorizontal: 40,
-          borderRadius: 30,
-          borderWidth: 2,
-          borderColor: "#9575CD",
-          marginBottom: 30,
-          marginHorizontal: 20,
-        }}
+        onPress={() => setIsModalVisible(true)}
+        style={styles.mainButton} // แยก Style ออกมาให้ชัดเจน
       >
         <Text style={styles.confirmButtonText}>ได้รับเงินบาทแล้ว</Text>
       </Pressable>
@@ -331,34 +285,36 @@ export default function ReceiveThb() {
         visible={isModalVisible}
         transparent={false}
         animationType="slide"
-        onRequestClose={() => setIsModalVisible(false)}
+        onRequestClose={() => !isProcessingPayment && setIsModalVisible(false)} // ห้ามปิดตอนกำลังโหลด
       >
         <View style={styles.modalContainer}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Enter Amount</Text>
-              <Pressable onPress={() => setIsModalVisible(false)}>
-                <Text style={styles.closeButton}>×</Text>
-              </Pressable>
+              {!isProcessingPayment && (
+                <Pressable onPress={() => setIsModalVisible(false)}>
+                  <Text style={styles.closeButton}>×</Text>
+                </Pressable>
+              )}
             </View>
+
             <View style={styles.amountRow}>
               <Text style={styles.amountText}>
                 ฿ {formatWithCommas(inputAmount)}
               </Text>
               <Text style={styles.currencyText}>THB</Text>
             </View>
+
             <View style={styles.keypad}>
               {["1", "2", "3", "4", "5", "6", "7", "8", "9", ".", "0", "⌫"].map(
                 (item) => (
                   <Pressable
                     key={item}
                     style={styles.key}
+                    disabled={isProcessingPayment}
                     onPress={() => {
-                      if (item === "⌫") {
-                        handleDelet();
-                      } else {
-                        handleNumberPress(item); // Now item is already a string
-                      }
+                      if (item === "⌫") handleDelet();
+                      else handleNumberPress(item);
                     }}
                   >
                     <Text style={styles.keyText}>{item}</Text>
@@ -366,7 +322,25 @@ export default function ReceiveThb() {
                 ),
               )}
             </View>
-            <ActionButton onPress={handleSetAmount} title="Receive Amount" />
+
+            {/* Action Button Section */}
+            <View style={{ width: "100%" }}>
+              {isProcessingPayment ? (
+                <View style={styles.processingButton}>
+                  <View style={{flexDirection:"row"}}>
+                    <ActivityIndicator color={"#5E35B1"} />
+                    <Text style={styles.confirmButtonText}>Processing...</Text>
+                  </View>
+                </View>
+              ) : (
+                <Pressable
+                  onPress={handleConfirmTransaction}
+                  style={styles.ConfirmButton}
+                >
+                  <Text style={styles.confirmButtonText}>Confirm Receive</Text>
+                </Pressable>
+              )}
+            </View>
           </View>
         </View>
       </Modal>
@@ -480,7 +454,6 @@ const styles = StyleSheet.create({
     aspectRatio: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "#ffffff", // Light key background
   },
   keyText: {
     color: "#4B3885", // Dark text for keys
@@ -575,5 +548,39 @@ const styles = StyleSheet.create({
     textAlign: "center",
     fontWeight: "600",
     color: "#5E35B1",
+  },
+  mainButton: {
+    backgroundColor: "#E6CCE9",
+    paddingVertical: 18,
+    paddingHorizontal: 40,
+    borderRadius: 30,
+    borderWidth: 2,
+    borderColor: "#9575CD",
+    marginBottom: 30,
+    marginHorizontal: 20,
+    alignItems: "center",
+  },
+  ConfirmButton: {
+    backgroundColor: "#E6CCE9",
+    paddingVertical: 18,
+    paddingHorizontal: 40,
+    borderRadius: 30,
+    borderWidth: 2,
+    borderColor: "#9575CD",
+    marginBottom: 30,
+    marginHorizontal: 20,
+    alignItems: "center",
+  },
+
+  processingButton: {
+    backgroundColor: "#E6CCE9",
+    paddingVertical: 18,
+    paddingHorizontal: 40,
+    borderRadius: 30,
+    borderWidth: 2,
+    borderColor: "#9575CD",
+    marginBottom: 30,
+    marginHorizontal: 20,
+    alignItems: "center",
   },
 });
