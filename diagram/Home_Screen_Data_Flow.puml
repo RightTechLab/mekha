@@ -1,0 +1,124 @@
+@startuml
+title Home Screen Data Flow (BalanceCard + TransactionList)
+
+actor User
+
+participant "Home Screen\n(Index)" as Home
+participant "SecureStore\n(nwcUrl)" as SecureNwc
+participant "NWC Store\n(Zustand)" as NwcStore
+participant "Balance Store\n(Zustand)" as BalStore
+participant "SecureStore\n(allThbReceive)" as SecureBal
+participant "BitcoinPrice API\n(getBitcoinPrice)" as PriceAPI
+participant "Wallet API\n(getSatBalance)" as WalletAPI
+participant "BalanceCard" as BalanceCard
+participant "TransactionList" as TxList
+participant "Tx API\n(getTransactionList)" as TxAPI
+participant "Timer 60s\n(setInterval)" as Timer
+participant "Router" as R
+participant "TransactionHistory\nScreen" as TxHistory
+
+== User opens Home ==
+
+User -> Home: Open app / view Home
+activate Home
+Home -> BalanceCard: initial render\n(balanceTHB, bitcoinPrice)
+Home -> TxList: initial render\n(transactions empty)
+
+== useEffect( [] ) - Check NWC URL ==
+
+Home -> SecureNwc: getItemAsync("nwcUrl")
+
+alt storedNwcUrl exists
+  SecureNwc --> Home: storedNwcUrl
+  Home -> NwcStore: setNwcUrl(storedNwcUrl)
+  Home -> Home: setIsModalVisible(false)
+else not found
+  SecureNwc --> Home: null
+  Home -> Home: setIsModalVisible(true)\n(show connect wallet modal)
+end
+
+== useEffect( [] ) - Load allThbReceive ==
+
+Home -> BalStore: loadAllThbReceive()
+
+BalStore -> SecureBal: getItemAsync(ALL_THB_RECEIVE_STORAGE_KEY)
+alt stored allThbReceive exists & is number
+  SecureBal --> BalStore: "1234.56"
+  BalStore -> BalStore: set({ allThbReceive, isLoaded:true })
+else no data or invalid
+  SecureBal --> BalStore: null / invalid
+  BalStore -> BalStore: set({ allThbReceive:0, isLoaded:true })
+end
+
+BalStore --> BalanceCard: allThbReceive via hook\n(useBalanceStore)
+
+note over BalanceCard
+  Internal calc:
+  - balanceSats = balanceTHB / (bitcoinPrice / 100,000,000)
+  - adjustedBalance = balanceTHB - allThbReceive
+  แสดง:
+  - THB: ฿ {adjustedBalance.toFixed(2)}
+  - sats: {balanceSats.toFixed(0)} sats
+end note
+
+== useEffect([nwcUrl]) on Home ==
+
+NwcStore --> Home: nwcUrl updated\n(หลัง checkNwcUrl สำเร็จ)
+
+alt nwcUrl is defined
+  Home -> PriceAPI: getBitcoinPrice()
+  PriceAPI --> Home: bitcoinPrice
+  Home -> Home: setBitcoinPrice(bitcoinPrice)
+
+  Home -> WalletAPI: getSatBalance(nwcUrl)
+  WalletAPI --> Home: satBalance
+  Home -> Home: covertSatToThb(satBalance)\nsetBalanceTHB(thbBalance)
+
+  Home -> BalanceCard: re-render\nwith new balanceTHB & bitcoinPrice
+
+  == Setup interval for BTC price ==
+  Home -> Timer: setInterval(fetchBtcPrice, 60000)
+
+  loop Every 60 seconds
+    Timer -> PriceAPI: getBitcoinPrice()
+    PriceAPI --> Home: updated bitcoinPrice
+    Home -> Home: setBitcoinPrice(newPrice)
+    Home -> BalanceCard: re-render\nwith updated price
+  end
+else nwcUrl is undefined
+  Home -> BalanceCard: wallet not connected yet\n(balance may stay 0)
+end
+
+== TransactionList useEffect([nwcUrl]) ==
+
+NwcStore --> TxList: nwcUrl value\n(trigger useEffect in TransactionList)
+
+TxList -> TxList: if (!nwcUrl)\nsetLoading(false); return;
+alt nwcUrl available
+  TxList -> TxAPI: getTransactionList(nwcUrl)
+  TxAPI --> TxList: transactionList[]
+
+  TxList -> TxList: filter amount > 1\nsetTransactions(filtered)
+
+  note over TxList
+    getAmountFromMemo(description):
+    - split by ","
+    - parseFloat(parts[0])
+    getDisplayAmount(item):
+    - try from memo
+    - fallback to item.amount
+  end note
+
+  TxList -> User: แสดงรายการธุรกรรมล่าสุด\nหรือข้อความว่างตามเงื่อนไข
+else no nwcUrl
+  TxList -> User: "Waiting for wallet connection..."
+end
+
+== View full transaction history button ==
+
+User -> Home: Tap "ดูประวัติธุรกรรมทั้งหมด"
+Home -> R: router.push("/transactionHistory")
+R --> TxHistory: Show TransactionHistory screen
+
+deactivate Home
+@enduml

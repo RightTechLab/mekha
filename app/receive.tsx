@@ -1,8 +1,12 @@
 import { webln } from "@getalby/sdk";
 import { router } from "expo-router";
 import { useEffect, useState } from "react";
+import * as Clipboard from "expo-clipboard";
+import QRCode from "react-native-qrcode-svg";
+
 import {
   ActivityIndicator,
+  Alert,
   Modal,
   Platform,
   Pressable,
@@ -14,7 +18,6 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import AmountDisplay from "@/components/receive/AmountDisplay";
 import Header from "@/components/receive/Header";
-import QRCodeDisplay from "@/components/receive/QRCodeDisplay";
 import { getBitcoinPrice } from "@/lib/getBitcoinPrice";
 import { useNwcStore } from "@/lib/State/appStore";
 
@@ -24,6 +27,7 @@ export default function Receive() {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isModalVisible, setIsModalVisible] = useState<boolean>(true);
   const [inputAmount, setInputAmount] = useState<string>("0");
+  const [isPressed, setIsPressed] = useState(false);
 
   const [invoice, setInvoice] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
@@ -31,6 +35,11 @@ export default function Receive() {
   const [paymentStatus, setPaymentStatus] = useState<string | null>(null);
   const [showSuccessScreen, setShowSuccessScreen] = useState<boolean>(false);
   const nwcUrl = useNwcStore((state) => state.nwcUrl);
+
+  const copyToClipboard = async (text: string) => {
+    await Clipboard.setStringAsync(text);
+    Alert.alert("Copied!", "QR code value copied to clipboard.");
+  };
 
   const createInvoice = async () => {
     if (amount <= 0) {
@@ -80,7 +89,7 @@ export default function Receive() {
             return false; // Continue polling
           }
         } catch (e: any) {
-          console.error("❌ Error checking invoice status:", e);
+          console.error("Error checking invoice status:", e);
           setError(e.message || "Error checking payment status");
           return false; // Continue polling on error
         }
@@ -216,7 +225,26 @@ export default function Receive() {
           </View>
         )}
 
-        {invoice && <QRCodeDisplay value={invoice} />}
+        {invoice && (
+          <Pressable
+            onPressIn={() => setIsPressed(true)}
+            onPressOut={() => setIsPressed(false)}
+            onPress={() => {
+              copyToClipboard(invoice);
+            }}
+            style={({ pressed }) => [
+              styles.qrContainer,
+              pressed ? styles.qrContainerPressed : styles.qrContainerNormal,
+            ]}
+          >
+            <QRCode
+              value={invoice}
+              size={280}
+              color={"#000000"}
+              backgroundColor="white"
+            />
+          </Pressable>
+        )}
 
 
         {showSuccessScreen && (
@@ -468,5 +496,20 @@ const styles = StyleSheet.create({
     textAlign: "center",
     fontWeight: "600",
     color: "#5E35B1",
+  },
+  qrContainer: {
+    padding: 20,
+    // Default styles for the container
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  qrContainerNormal: {
+    backgroundColor: "#fff",
+    transform: [{ scale: 1 }],
+  },
+  qrContainerPressed: {
+    backgroundColor: "#e0e0e0", // Change background color when pressed
+    transform: [{ scale: 0.95 }], // Scale down slightly when pressed
+    opacity: 0.8, // Make it slightly transparent
   },
 });
