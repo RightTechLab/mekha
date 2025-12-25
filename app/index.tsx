@@ -182,7 +182,7 @@ export default function Index() {
       <HeaderIcon />
 
        {/* NOTE: Test when store nwc already */}
-      <View style={{ justifyContent: "center", alignItems: "center" }}>
+      {/* <View style={{ justifyContent: "center", alignItems: "center" }}>
         <Pressable
            onPress={async () => { 
              await SecureStore.deleteItemAsync("nwcUrl"); }
@@ -190,7 +190,7 @@ export default function Index() {
         > 
          <Text> Test delete nwcUrl</Text> 
         </Pressable>
-      </View> 
+      </View>  */}
 
       {/* NOTE: Test go to screen cremara */}
       {/* <View style={{ justifyContent: "center", alignItems: "center" }}> */}
