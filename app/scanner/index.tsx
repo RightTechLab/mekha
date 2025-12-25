@@ -3,7 +3,7 @@ import { CameraView, useCameraPermissions } from "expo-camera";
 import { Stack, router } from "expo-router";
 import * as SecureStore from "expo-secure-store";
 import React, { useEffect, useRef } from "react";
-import { AppState, Button, Linking, Platform, StatusBar, Text } from "react-native";
+import { Alert, AppState, Button, Linking, Platform, StatusBar, Text } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function Scanner() {
@@ -59,17 +59,38 @@ export default function Scanner() {
         style={{ flex: 1 }}
         facing="back"
         onBarcodeScanned={({ data }) => {
+          if (!data || qrLock.current) return;
+
           if (
             data &&
             !qrLock.current &&
             data.startsWith("nostr+walletconnect://")
           ) {
+            
             qrLock.current = true;
             setTimeout(async () => {
               setNwcUrl(data);
               await SecureStore.setItemAsync("nwcUrl", data);
               router.replace("/");
             }, 500);
+          }else{
+            // Handle Invalid URL
+            qrLock.current = true; 
+            Alert.alert(
+              "Invalid QR Code",
+              "The scanned code is not a valid NWC format.",
+              [
+                {
+                  text: "OK",
+                  onPress: () => {
+                    // Unlock scanning only after user acknowledges the alert
+                    setTimeout(() => {
+                      qrLock.current = false;
+                    }, 1000);
+                  },
+                },
+              ]
+            );
           }
         }}
         barcodeScannerSettings={{ barcodeTypes: ["qr"] }}

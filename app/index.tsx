@@ -7,6 +7,7 @@ import { router } from "expo-router";
 import * as SecureStore from "expo-secure-store";
 import { useEffect, useState } from "react";
 import {
+  Alert,
   Modal,
   Pressable,
   StyleSheet,
@@ -52,7 +53,7 @@ export default function Index() {
 
       // Validate if the pasted text looks like a valid NWC URL
       if (!text || !text.startsWith("nostr+walletconnect://")) {
-        console.error("Invalid NWC URL format");
+        Alert.alert("Invalid NWC URL format", "Please start with nostr+walletconnect://");
         // You might want to show an error message to the user here
         return;
       }
@@ -180,16 +181,16 @@ export default function Index() {
 
       <HeaderIcon />
 
-      {/*  NOTE: Test when store nwc already */}
-      {/* <View style={{ justifyContent: "center", alignItems: "center" }}> */}
-      {/*   <Pressable */}
-      {/*     onPress={async () => { */}
-      {/*       await SecureStore.deleteItemAsync("nwcUrl"); */}
-      {/*     }} */}
-      {/*   > */}
-      {/*     <Text> Test delete nwcUrl</Text> */}
-      {/*   </Pressable> */}
-      {/* </View> */}
+       {/* NOTE: Test when store nwc already */}
+      {/* <View style={{ justifyContent: "center", alignItems: "center" }}>
+        <Pressable
+           onPress={async () => { 
+             await SecureStore.deleteItemAsync("nwcUrl"); }
+           }
+        > 
+         <Text> Test delete nwcUrl</Text> 
+        </Pressable>
+      </View>  */}
 
       {/* NOTE: Test go to screen cremara */}
       {/* <View style={{ justifyContent: "center", alignItems: "center" }}> */}
