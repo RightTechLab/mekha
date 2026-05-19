@@ -1,7 +1,7 @@
 import db from './client';
 import { CREATE_TABLES } from './schema';
 
-const CURRENT_VERSION = 2;
+const CURRENT_VERSION = 3;
 
 export function runMigrations(): void {
   db.execSync('PRAGMA journal_mode = WAL;');
@@ -52,6 +52,16 @@ export function runMigrations(): void {
     } catch (_) {
       // Column may already exist
     }
+  }
+
+  if (currentVersion < 3) {
+    db.execSync(`CREATE TABLE IF NOT EXISTS categories (
+      id          TEXT PRIMARY KEY,
+      name        TEXT NOT NULL,
+      color       TEXT,
+      sort_order  INTEGER DEFAULT 0,
+      created_at  TEXT DEFAULT (datetime('now'))
+    );`);
   }
 
   db.execSync(`PRAGMA user_version = ${CURRENT_VERSION};`);
