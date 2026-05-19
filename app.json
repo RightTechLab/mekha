@@ -22,7 +22,7 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#7C3AED"
       },
-      "package": "com.mekha.pos",
+      "package": "com.rightshift.mekha",
       "edgeToEdgeEnabled": true
     },
     "web": {
