@@ -37,7 +37,7 @@ export default function PosScreen() {
     if (key === 'C') {
       setKeypadDigits('');
     } else if (key === '+') {
-      // Add to cart
+      // Add to cart and keep entering
       if (keypadAmount > 0) {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
         addItem({
@@ -53,12 +53,32 @@ export default function PosScreen() {
         setKeypadNote('');
       }
     } else {
-      // Limit to 8 digits (฿999,999.99)
       if (keypadDigits.length < 8) {
         setKeypadDigits((prev) => prev + key);
       }
     }
   }, [keypadDigits, keypadAmount, keypadNote, addItem]);
+
+  const handleKeypadCheckout = useCallback(() => {
+    // Add current amount if any, then go to checkout
+    if (keypadAmount > 0) {
+      addItem({
+        menuId: `custom-${Crypto.randomUUID()}`,
+        name: keypadNote.trim() || 'รายการกำหนดเอง',
+        unitPrice: keypadAmount,
+        quantity: 1,
+        selectedOptions: [],
+        note: '',
+        itemTotal: keypadAmount,
+      });
+      setKeypadDigits('');
+      setKeypadNote('');
+    }
+    // Navigate to checkout (need at least 1 item)
+    if (items.length > 0 || keypadAmount > 0) {
+      router.push('/(tabs)/pos/checkout');
+    }
+  }, [keypadAmount, keypadNote, addItem, items.length]);
 
   useFocusEffect(
     useCallback(() => {
@@ -168,43 +188,29 @@ export default function PosScreen() {
 
           {showCustomAmount ? (
             /* ===== KEYPAD MODE ===== */
-            <View className="flex-1 bg-neutral-900 rounded-t-3xl px-4 pt-5">
-              {/* Charge button */}
-              <Pressable
-                className={`w-full py-4 rounded-2xl items-center mb-4 ${
-                  keypadAmount > 0 ? 'bg-yellow-700' : 'bg-neutral-700'
-                }`}
-                onPress={() => {
-                  if (keypadAmount > 0) {
-                    handleKeypadPress('+');
-                  }
-                }}
-              >
-                <Text className="text-white text-xl font-bold">
-                  Charge ฿{keypadAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                </Text>
-              </Pressable>
-
-              {/* Note + Amount display */}
-              <View className="flex-row items-center justify-between mb-4 px-1">
-                <Pressable className="flex-row items-center gap-1.5">
-                  <Ionicons name="pencil" size={14} color="#9CA3AF" />
-                  <TextInput
-                    className="text-neutral-400 text-sm"
-                    placeholder="Add a Note"
-                    placeholderTextColor="#6B7280"
-                    value={keypadNote}
-                    onChangeText={setKeypadNote}
-                    style={{ minWidth: 100 }}
-                  />
-                </Pressable>
-                <Text className="text-yellow-500 text-3xl font-bold">
+            <View className="flex-1 bg-white px-4 pt-4">
+              {/* Amount display */}
+              <View className="items-center mb-4">
+                <Text className="text-purple-600 text-5xl font-bold">
                   ฿{keypadAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </Text>
               </View>
 
+              {/* Note field */}
+              <View className="flex-row items-center justify-center mb-4">
+                <Ionicons name="pencil" size={14} color="#7C3AED" />
+                <TextInput
+                  className="text-mekha-muted text-sm ml-1.5"
+                  placeholder="โน้ต (ไม่บังคับ)"
+                  placeholderTextColor="#9CA3AF"
+                  value={keypadNote}
+                  onChangeText={setKeypadNote}
+                  style={{ minWidth: 120 }}
+                />
+              </View>
+
               {/* Numpad */}
-              <View className="flex-1 justify-end pb-4">
+              <View className="flex-1 pb-3">
                 {[
                   ['1', '2', '3'],
                   ['4', '5', '6'],
@@ -215,12 +221,12 @@ export default function PosScreen() {
                     {row.map((key) => (
                       <Pressable
                         key={key}
-                        className="flex-1 items-center justify-center m-0.5 rounded-lg bg-neutral-800 active:bg-neutral-700"
+                        className="flex-1 items-center justify-center m-1 rounded-2xl bg-purple-50 active:bg-purple-100"
                         onPress={() => handleKeypadPress(key)}
                       >
                         <Text
                           className={`text-3xl font-semibold ${
-                            key === '+' ? 'text-yellow-500' : key === 'C' ? 'text-neutral-300' : 'text-white'
+                            key === '+' ? 'text-purple-600' : key === 'C' ? 'text-red-400' : 'text-mekha-text'
                           }`}
                         >
                           {key}
@@ -230,6 +236,19 @@ export default function PosScreen() {
                   </View>
                 ))}
               </View>
+
+              {/* Checkout button */}
+              <Pressable
+                className={`w-full py-4 rounded-2xl items-center mb-3 ${
+                  keypadAmount > 0 || items.length > 0 ? 'bg-purple-600 active:bg-purple-700' : 'bg-purple-200'
+                }`}
+                onPress={handleKeypadCheckout}
+                disabled={keypadAmount <= 0 && items.length === 0}
+              >
+                <Text className="text-white font-semibold text-base">
+                  ชำระเงิน · ฿{(getTotal() + keypadAmount).toFixed(0)}
+                </Text>
+              </Pressable>
             </View>
           ) : (
             /* ===== ITEMS MODE ===== */
@@ -378,6 +397,7 @@ export default function PosScreen() {
         </View>
 
         {/* Cart Panel (always visible on tablet, bottom sheet on phone) */}
+        {(isTablet || !showCustomAmount) && (
         <View
           className={`${
             isTablet
@@ -410,6 +430,7 @@ export default function PosScreen() {
             </View>
           )}
         </View>
+        )}
       </View>
 
       <AddToCartModal

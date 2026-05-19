@@ -34,8 +34,6 @@ export default function AddToCartModal({ visible, menu, onClose, onAdd }: Props)
     }
   }, [menu]);
 
-  if (!menu) return null;
-
   const toggleOption = (groupId: string, itemId: string, multiple: boolean) => {
     setSelected((prev) => {
       const current = prev[groupId] || [];
@@ -59,8 +57,9 @@ export default function AddToCartModal({ visible, menu, onClose, onAdd }: Props)
     const result: SelectedOption[] = [];
     for (const group of groups) {
       const ids = selected[group.id] || [];
+      const items = group.items ?? [];
       for (const id of ids) {
-        const item = group.items.find((i) => i.id === id);
+        const item = items.find((i) => i.id === id);
         if (item) {
           result.push({
             groupId: group.id,
@@ -76,9 +75,10 @@ export default function AddToCartModal({ visible, menu, onClose, onAdd }: Props)
   };
 
   const optionsDelta = getSelectedOptions().reduce((sum, o) => sum + o.priceDelta, 0);
-  const itemTotal = quantity * (menu.price + optionsDelta);
+  const itemTotal = quantity * ((menu?.price ?? 0) + optionsDelta);
 
   const handleConfirm = () => {
+    if (!menu) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     onAdd({
       menuId: menu.id,
@@ -119,6 +119,8 @@ export default function AddToCartModal({ visible, menu, onClose, onAdd }: Props)
       runOnJS(onClose)();
     });
   };
+
+  if (!menu) return null;
 
   return (
     <Modal visible={visible} animationType="none" transparent>

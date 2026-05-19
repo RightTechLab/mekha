@@ -192,16 +192,18 @@ export default function MenuScreen() {
               value={category}
               onChangeText={(text) => {
                 setCategory(text);
-                setShowCatSuggest(text.length > 0);
+                setShowCatSuggest(true);
               }}
               onFocus={() => setShowCatSuggest(true)}
               onBlur={() => setTimeout(() => setShowCatSuggest(false), 200)}
             />
-            {showCatSuggest && categories.filter((c) => c.toLowerCase().includes(category.toLowerCase())).length > 0 && (
+            {showCatSuggest && (() => {
+              const allCats = [...new Set([...userCategories.map((c) => c.name), ...categories])];
+              const filtered = allCats.filter((c) => c.toLowerCase().includes(category.toLowerCase()));
+              if (filtered.length === 0) return null;
+              return (
               <View className="bg-white border border-mekha-border rounded-xl mb-2 overflow-hidden">
-                {categories
-                  .filter((c) => c.toLowerCase().includes(category.toLowerCase()))
-                  .map((c) => (
+                {filtered.map((c) => (
                     <Pressable
                       key={c}
                       className="px-4 py-2.5 border-b border-mekha-border active:bg-purple-50"
@@ -214,7 +216,8 @@ export default function MenuScreen() {
                     </Pressable>
                   ))}
               </View>
-            )}
+              );
+            })()}
           </View>
           <Pressable
             className="bg-purple-600 py-3 rounded-xl items-center"
