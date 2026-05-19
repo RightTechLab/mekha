@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
-import { View, Text, Pressable, TextInput, ScrollView, Modal, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, Pressable, TextInput, ScrollView, Modal, KeyboardAvoidingView, Platform, TouchableWithoutFeedback } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
+import Animated, { useSharedValue, useAnimatedStyle, withTiming, runOnJS } from 'react-native-reanimated';
 import { getOptionGroups, getOptionItems } from '../db/repositories/menuRepo';
 import type { Menu, OptionGroup, OptionItem, SelectedOption, CartItem } from '../types';
 
@@ -91,11 +92,42 @@ export default function AddToCartModal({ visible, menu, onClose, onAdd }: Props)
     onClose();
   };
 
+  const translateY = useSharedValue(300);
+  const overlayOpacity = useSharedValue(0);
+
+  useEffect(() => {
+    if (visible) {
+      translateY.value = withTiming(0, { duration: 300 });
+      overlayOpacity.value = withTiming(1, { duration: 200 });
+    } else {
+      translateY.value = withTiming(300, { duration: 250 });
+      overlayOpacity.value = withTiming(0, { duration: 200 });
+    }
+  }, [visible]);
+
+  const sheetStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: translateY.value }],
+  }));
+
+  const overlayStyle = useAnimatedStyle(() => ({
+    opacity: overlayOpacity.value,
+  }));
+
+  const handleDismiss = () => {
+    translateY.value = withTiming(300, { duration: 250 });
+    overlayOpacity.value = withTiming(0, { duration: 200 }, () => {
+      runOnJS(onClose)();
+    });
+  };
+
   return (
-    <Modal visible={visible} animationType="slide" transparent>
+    <Modal visible={visible} animationType="none" transparent>
       <KeyboardAvoidingView className="flex-1 justify-end" behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <View className="flex-1 justify-end bg-black/40">
-        <View className="bg-white rounded-t-3xl max-h-[80%]">
+      <View className="flex-1 justify-end">
+        <TouchableWithoutFeedback onPress={handleDismiss}>
+          <Animated.View className="absolute inset-0 bg-black/40" style={overlayStyle} />
+        </TouchableWithoutFeedback>
+        <Animated.View className="bg-white rounded-t-3xl max-h-[80%]" style={sheetStyle}>
           {/* Header */}
           <View className="px-5 pt-5 pb-3 border-b border-mekha-border">
             <View className="flex-row items-center justify-between">
@@ -198,7 +230,7 @@ export default function AddToCartModal({ visible, menu, onClose, onAdd }: Props)
               </Text>
             </Pressable>
           </View>
-        </View>
+        </Animated.View>
       </View>
       </KeyboardAvoidingView>
     </Modal>
