@@ -170,7 +170,7 @@ export default function CheckoutScreen() {
 
       const newTotalPaid = newSplits.reduce((sum, s) => sum + s.amount, 0);
       if (newTotalPaid >= total - 0.01) {
-        completeOrder(method);
+        completeOrder(method, undefined, newSplits);
       } else {
         setStep('summary');
       }
@@ -179,8 +179,9 @@ export default function CheckoutScreen() {
   );
 
   const completeOrder = useCallback(
-    async (method: PaymentMethod, extra?: { amountSat?: number; btcRate?: number }) => {
+    async (method: PaymentMethod, extra?: { amountSat?: number; btcRate?: number }, splitsOverride?: typeof paidSplits) => {
       const orderId = Crypto.randomUUID();
+      const splits = splitsOverride ?? paidSplits;
 
       // Create order with table link
       createOrder({ id: orderId, status: 'open', note: null, table_id: tableId });
@@ -212,9 +213,9 @@ export default function CheckoutScreen() {
         clearTable(tableId);
       }
 
-      if (paidSplits.length > 0) {
+      if (splits.length > 0) {
         // Split bill — create transaction per split
-        for (const split of paidSplits) {
+        for (const split of splits) {
           createTransaction({
             id: Crypto.randomUUID(),
             order_id: orderId,
@@ -233,13 +234,15 @@ export default function CheckoutScreen() {
             void_reason: null,
           });
         }
-        // Last split (current payment)
-        if (remaining > 0) {
+        // Last split (current payment) — only if remaining after all recorded splits
+        const splitTotal = splits.reduce((sum, s) => sum + s.amount, 0);
+        const leftover = total - splitTotal;
+        if (leftover > 0.01) {
           createTransaction({
             id: Crypto.randomUUID(),
             order_id: orderId,
             payment_method: method,
-            amount_thb: remaining,
+            amount_thb: leftover,
             amount_sat: extra?.amountSat ?? null,
             btc_rate_thb: extra?.btcRate ?? null,
             discount_amount: discountAmount,
