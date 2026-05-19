@@ -321,13 +321,11 @@ export default function CheckoutScreen() {
           </Text>
         </View>
 
-        {received >= payAmount && (
-          <View className="bg-green-50 rounded-2xl px-4 py-3 mb-6">
-            <Text className="text-green-700 font-semibold">
-              เงินทอน: ฿{change.toFixed(2)}
-            </Text>
-          </View>
-        )}
+        <View className="bg-green-50 rounded-2xl px-4 py-3 mb-6">
+          <Text className={`font-semibold ${received >= payAmount ? 'text-green-700' : 'text-gray-400'}`}>
+            เงินทอน: {received >= payAmount ? `฿${change.toFixed(2)}` : '฿ —'}
+          </Text>
+        </View>
 
         {/* NumPad */}
         <View className="items-center">
