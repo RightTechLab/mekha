@@ -96,6 +96,7 @@ export default function SettingsScreen() {
   const handleSetCashierPin = async () => {
     if (cashierPin.length !== 6) {
       Alert.alert('Error', 'PIN ต้อง 6 หลัก');
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       return;
     }
     const hash = await hashPin(cashierPin);
@@ -166,6 +167,7 @@ export default function SettingsScreen() {
       const data = JSON.parse(content);
       if (!data.menus || !Array.isArray(data.menus)) {
         Alert.alert('ผิดพลาด', 'ไฟล์ไม่ถูกต้อง ต้องเป็น JSON ที่ส่งออกจาก Mekha');
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
         return;
       }
       let imported = 0;
@@ -190,6 +192,7 @@ export default function SettingsScreen() {
       Alert.alert('สำเร็จ', `นำเข้า ${imported} เมนู (ข้าม ${skipped} รายการที่มีอยู่แล้ว)`);
     } catch (e: any) {
       Alert.alert('ผิดพลาด', e?.message ?? 'ไม่สามารถนำเข้าไฟล์ได้');
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     }
   };
 

@@ -120,6 +120,7 @@ export default function CheckoutScreen() {
           const lnAddress = await SecureStore.getItemAsync('mekha.ln_address');
           if (!lnAddress) {
             setLnError('ยังไม่ได้ตั้งค่า Lightning Address ในตั้งค่า');
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
             setLnLoading(false);
             return;
           }
@@ -132,6 +133,7 @@ export default function CheckoutScreen() {
           const params = await fetchLnurlPayParams(lnAddress);
           if (amountMsat < params.minSendable || amountMsat > params.maxSendable) {
             setLnError(`จำนวนเงินไม่อยู่ในช่วงที่รองรับ (${params.minSendable / 1000}-${params.maxSendable / 1000} sats)`);
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
             setLnLoading(false);
             return;
           }
@@ -139,6 +141,7 @@ export default function CheckoutScreen() {
           setLnInvoice(invoice);
         } catch (e: any) {
           setLnError(e?.message ?? 'ไม่สามารถสร้าง Invoice ได้');
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
         } finally {
           setLnLoading(false);
         }
