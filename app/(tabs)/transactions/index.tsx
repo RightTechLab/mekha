@@ -1,12 +1,15 @@
 import { useState, useCallback, useEffect } from 'react';
-import { View, Text, Pressable, ScrollView } from 'react-native';
+import { View, Text, Pressable, ScrollView, Modal, TouchableWithoutFeedback } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { FlashList } from '@shopify/flash-list';
 import { format, subDays } from 'date-fns';
+import * as SecureStore from 'expo-secure-store';
+import QRCode from 'react-native-qrcode-svg';
 import { getTransactions, getTransactionsByOrderId } from '../../../src/db/repositories/transactionRepo';
 import { getOrderItems } from '../../../src/db/repositories/orderRepo';
 import { useSessionStore } from '../../../src/features/auth/sessionStore';
+import { generatePromptPayQR } from '../../../src/lib/promptpay';
 import type { Transaction, OrderItem } from '../../../src/types';
 
 const METHOD_LABELS: Record<string, string> = {
@@ -150,6 +153,8 @@ function TransactionCard({ txn }: { txn: Transaction }) {
   const [expanded, setExpanded] = useState(false);
   const [items, setItems] = useState<OrderItem[]>([]);
   const [splitTxns, setSplitTxns] = useState<Transaction[]>([]);
+  const [showQr, setShowQr] = useState(false);
+  const [qrData, setQrData] = useState('');
 
   // Load split info immediately on mount/recycle
   useEffect(() => {
@@ -251,6 +256,55 @@ function TransactionCard({ txn }: { txn: Transaction }) {
       )}
       {expanded && items.length === 0 && (
         <Text className="text-xs text-mekha-muted mt-2 italic">ไม่มีรายละเอียด</Text>
+      )}
+      {expanded && txn.status === 'completed' && (txn.payment_method === 'promptpay' || txn.payment_method === 'lightning') && (
+        <Pressable
+          className="mt-3 bg-purple-50 py-2 rounded-xl items-center"
+          onPress={async (e) => {
+            e.stopPropagation?.();
+            if (txn.payment_method === 'promptpay') {
+              const promptpayId = await SecureStore.getItemAsync('mekha.promptpay_id');
+              if (promptpayId) {
+                setQrData(generatePromptPayQR(promptpayId, txn.amount_thb));
+                setShowQr(true);
+              }
+            } else if (txn.payment_method === 'lightning' && txn.lightning_invoice) {
+              setQrData(txn.lightning_invoice);
+              setShowQr(true);
+            }
+          }}
+        >
+          <Text className="text-sm font-medium text-purple-700">แสดง QR อีกครั้ง</Text>
+        </Pressable>
+      )}
+      {showQr && (
+        <Modal visible={showQr} animationType="fade" transparent>
+          <TouchableWithoutFeedback onPress={() => setShowQr(false)}>
+            <View className="flex-1 bg-black/40 items-center justify-center">
+              <TouchableWithoutFeedback>
+                <View className="bg-white rounded-2xl p-6 mx-6 items-center">
+                  <Text className="text-lg font-bold text-mekha-text mb-2">
+                    {txn.payment_method === 'promptpay' ? 'PromptPay QR' : 'Lightning Invoice'}
+                  </Text>
+                  <Text className="text-purple-600 font-semibold mb-4">฿{txn.amount_thb.toFixed(2)}</Text>
+                  {txn.payment_method === 'lightning' && (
+                    <View className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-2 mb-4">
+                      <Text className="text-xs text-amber-700 text-center">
+                        Invoice นี้อาจหมดอายุแล้ว ตรวจสอบก่อนให้ลูกค้าสแกน
+                      </Text>
+                    </View>
+                  )}
+                  <View className="bg-white p-3 rounded-xl border border-mekha-border">
+                    <QRCode value={qrData} size={200} />
+                  </View>
+                  <Pressable className="mt-4 py-2 px-6 rounded-xl bg-purple-600" onPress={() => setShowQr(false)}>
+                    <Text className="text-white font-semibold">ปิด</Text>
+                  </Pressable>
+                </View>
+              </TouchableWithoutFeedback>
+            </View>
+          </TouchableWithoutFeedback>
+        </Modal>
       )}
     </Pressable>
   );
