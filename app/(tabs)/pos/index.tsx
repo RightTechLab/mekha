@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { View, Text, Pressable, ScrollView, Image, Modal, TextInput, KeyboardAvoidingView, Platform, TouchableWithoutFeedback } from 'react-native';
+import { View, Text, Pressable, ScrollView, Image, TextInput } from 'react-native';
 import { router } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -25,9 +25,40 @@ export default function PosScreen() {
   const [tablesEnabled, setTablesEnabled] = useState(false);
   const [tables, setTables] = useState<TableItem[]>([]);
   const [showCustomAmount, setShowCustomAmount] = useState(false);
-  const [customName, setCustomName] = useState('');
-  const [customPrice, setCustomPrice] = useState('');
+  const [keypadDigits, setKeypadDigits] = useState('');
+  const [keypadNote, setKeypadNote] = useState('');
   const { items, addItem, removeItem, updateQty, getTotal, clear, tableId, tableName, switchTable, getTableItemCount } = useCartStore();
+
+  // Keypad amount (digits are in cents, e.g. "1250" = ฿12.50)
+  const keypadAmount = parseFloat(keypadDigits || '0') / 100;
+
+  const handleKeypadPress = useCallback((key: string) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    if (key === 'C') {
+      setKeypadDigits('');
+    } else if (key === '+') {
+      // Add to cart
+      if (keypadAmount > 0) {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+        addItem({
+          menuId: `custom-${Crypto.randomUUID()}`,
+          name: keypadNote.trim() || 'รายการกำหนดเอง',
+          unitPrice: keypadAmount,
+          quantity: 1,
+          selectedOptions: [],
+          note: '',
+          itemTotal: keypadAmount,
+        });
+        setKeypadDigits('');
+        setKeypadNote('');
+      }
+    } else {
+      // Limit to 8 digits (฿999,999.99)
+      if (keypadDigits.length < 8) {
+        setKeypadDigits((prev) => prev + key);
+      }
+    }
+  }, [keypadDigits, keypadAmount, keypadNote, addItem]);
 
   useFocusEffect(
     useCallback(() => {
@@ -77,23 +108,6 @@ export default function PosScreen() {
     router.push('/(tabs)/pos/checkout');
   }, [items]);
 
-  const handleCustomAmountConfirm = useCallback(() => {
-    const price = parseFloat(customPrice);
-    if (isNaN(price) || price <= 0) return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    addItem({
-      menuId: `custom-${Crypto.randomUUID()}`,
-      name: customName.trim() || 'รายการกำหนดเอง',
-      unitPrice: price,
-      quantity: 1,
-      selectedOptions: [],
-      note: '',
-      itemTotal: price,
-    });
-    setCustomName('');
-    setCustomPrice('');
-    setShowCustomAmount(false);
-  }, [customName, customPrice, addItem]);
 
   return (
     <SafeAreaView className="flex-1 bg-white">
@@ -109,13 +123,6 @@ export default function PosScreen() {
             />
             <Text className="text-2xl font-bold text-mekha-text">Mekha</Text>
             <View className="flex-row items-center gap-2 ml-auto">
-              <Pressable
-                className="bg-purple-50 px-3 py-1.5 rounded-full flex-row items-center gap-1"
-                onPress={() => setShowCustomAmount(true)}
-              >
-                <Ionicons name="add-circle-outline" size={16} color="#7C3AED" />
-                <Text className="text-purple-700 text-sm font-medium">กรอกราคา</Text>
-              </Pressable>
               {tablesEnabled && tableName && (
                 <View className="bg-purple-100 px-3 py-1 rounded-full">
                   <View className="flex-row items-center gap-1">
@@ -129,7 +136,105 @@ export default function PosScreen() {
             </View>
           </View>
 
-          {/* Table selector */}
+          {/* Mode tabs: KEYPAD / ITEMS */}
+          <View className="flex-row px-4 mb-2">
+            <Pressable
+              className={`flex-1 py-2 items-center border-b-2 ${
+                showCustomAmount ? 'border-purple-600' : 'border-transparent'
+              }`}
+              onPress={() => setShowCustomAmount(true)}
+            >
+              <View className="flex-row items-center gap-1.5">
+                <Ionicons name="keypad" size={16} color={showCustomAmount ? '#7C3AED' : '#6B7280'} />
+                <Text className={`text-sm font-semibold ${showCustomAmount ? 'text-purple-600' : 'text-mekha-muted'}`}>
+                  KEYPAD
+                </Text>
+              </View>
+            </Pressable>
+            <Pressable
+              className={`flex-1 py-2 items-center border-b-2 ${
+                !showCustomAmount ? 'border-purple-600' : 'border-transparent'
+              }`}
+              onPress={() => setShowCustomAmount(false)}
+            >
+              <View className="flex-row items-center gap-1.5">
+                <Ionicons name="list" size={16} color={!showCustomAmount ? '#7C3AED' : '#6B7280'} />
+                <Text className={`text-sm font-semibold ${!showCustomAmount ? 'text-purple-600' : 'text-mekha-muted'}`}>
+                  ITEMS
+                </Text>
+              </View>
+            </Pressable>
+          </View>
+
+          {showCustomAmount ? (
+            /* ===== KEYPAD MODE ===== */
+            <View className="flex-1 bg-neutral-900 rounded-t-3xl px-4 pt-5">
+              {/* Charge button */}
+              <Pressable
+                className={`w-full py-4 rounded-2xl items-center mb-4 ${
+                  keypadAmount > 0 ? 'bg-yellow-700' : 'bg-neutral-700'
+                }`}
+                onPress={() => {
+                  if (keypadAmount > 0) {
+                    handleKeypadPress('+');
+                  }
+                }}
+              >
+                <Text className="text-white text-xl font-bold">
+                  Charge ฿{keypadAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </Text>
+              </Pressable>
+
+              {/* Note + Amount display */}
+              <View className="flex-row items-center justify-between mb-4 px-1">
+                <Pressable className="flex-row items-center gap-1.5">
+                  <Ionicons name="pencil" size={14} color="#9CA3AF" />
+                  <TextInput
+                    className="text-neutral-400 text-sm"
+                    placeholder="Add a Note"
+                    placeholderTextColor="#6B7280"
+                    value={keypadNote}
+                    onChangeText={setKeypadNote}
+                    style={{ minWidth: 100 }}
+                  />
+                </Pressable>
+                <Text className="text-yellow-500 text-3xl font-bold">
+                  ฿{keypadAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </Text>
+              </View>
+
+              {/* Numpad */}
+              <View className="flex-1 justify-end pb-4">
+                {[
+                  ['1', '2', '3'],
+                  ['4', '5', '6'],
+                  ['7', '8', '9'],
+                  ['C', '0', '+'],
+                ].map((row, ri) => (
+                  <View key={ri} className="flex-row flex-1">
+                    {row.map((key) => (
+                      <Pressable
+                        key={key}
+                        className="flex-1 items-center justify-center m-0.5 rounded-lg bg-neutral-800 active:bg-neutral-700"
+                        onPress={() => handleKeypadPress(key)}
+                      >
+                        <Text
+                          className={`text-3xl font-semibold ${
+                            key === '+' ? 'text-yellow-500' : key === 'C' ? 'text-neutral-300' : 'text-white'
+                          }`}
+                        >
+                          {key}
+                        </Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                ))}
+              </View>
+            </View>
+          ) : (
+            /* ===== ITEMS MODE ===== */
+            <View className="flex-1">
+
           {tablesEnabled && tables.length > 0 && (
             <ScrollView
               horizontal
@@ -268,6 +373,8 @@ export default function PosScreen() {
               )}
             />
           )}
+            </View>
+          )}
         </View>
 
         {/* Cart Panel (always visible on tablet, bottom sheet on phone) */}
@@ -311,51 +418,6 @@ export default function PosScreen() {
         onClose={() => setSelectedMenu(null)}
         onAdd={addItem}
       />
-
-      {/* Custom Amount Modal */}
-      <Modal visible={showCustomAmount} animationType="fade" transparent>
-        <KeyboardAvoidingView className="flex-1" behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-          <TouchableWithoutFeedback onPress={() => setShowCustomAmount(false)}>
-            <View className="flex-1 bg-black/40 items-center justify-center">
-              <TouchableWithoutFeedback>
-                <View className="bg-white rounded-2xl p-5 mx-6 w-80">
-                  <Text className="text-lg font-bold text-mekha-text mb-4">กรอกราคาเอง</Text>
-                  <Text className="text-sm text-mekha-muted mb-1">ชื่อรายการ (ไม่บังคับ)</Text>
-                  <TextInput
-                    className="border border-mekha-border rounded-xl px-4 py-3 mb-3 text-mekha-text"
-                    placeholder="เช่น บริการเพิ่มเติม"
-                    placeholderTextColor="#9CA3AF"
-                    value={customName}
-                    onChangeText={setCustomName}
-                  />
-                  <Text className="text-sm text-mekha-muted mb-1">ราคา (฿) *</Text>
-                  <TextInput
-                    className="border border-mekha-border rounded-xl px-4 py-3 mb-4 text-mekha-text"
-                    placeholder="0"
-                    placeholderTextColor="#9CA3AF"
-                    value={customPrice}
-                    onChangeText={setCustomPrice}
-                    keyboardType="decimal-pad"
-                    autoFocus
-                  />
-                  <Pressable
-                    className={`py-3 rounded-xl items-center ${
-                      parseFloat(customPrice) > 0 ? 'bg-purple-600' : 'bg-purple-200'
-                    }`}
-                    onPress={handleCustomAmountConfirm}
-                    disabled={!(parseFloat(customPrice) > 0)}
-                  >
-                    <Text className="text-white font-semibold">เพิ่มเข้าตะกร้า</Text>
-                  </Pressable>
-                  <Pressable className="mt-3 items-center" onPress={() => setShowCustomAmount(false)}>
-                    <Text className="text-mekha-muted">ยกเลิก</Text>
-                  </Pressable>
-                </View>
-              </TouchableWithoutFeedback>
-            </View>
-          </TouchableWithoutFeedback>
-        </KeyboardAvoidingView>
-      </Modal>
     </SafeAreaView>
   );
 }
