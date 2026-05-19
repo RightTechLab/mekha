@@ -1,11 +1,12 @@
 import { useState, useCallback } from 'react';
-import { View, Text, Pressable, ScrollView, Image } from 'react-native';
+import { View, Text, Pressable, ScrollView, Image, Modal, TextInput, KeyboardAvoidingView, Platform, TouchableWithoutFeedback } from 'react-native';
 import { router } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FlashList } from '@shopify/flash-list';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
+import * as Crypto from 'expo-crypto';
 import { useCartStore } from '../../../src/features/cart/cartStore';
 import { getAllMenus, getMenuCategories } from '../../../src/db/repositories/menuRepo';
 import { getSetting } from '../../../src/db/repositories/transactionRepo';
@@ -23,6 +24,9 @@ export default function PosScreen() {
   const [selectedMenu, setSelectedMenu] = useState<Menu | null>(null);
   const [tablesEnabled, setTablesEnabled] = useState(false);
   const [tables, setTables] = useState<TableItem[]>([]);
+  const [showCustomAmount, setShowCustomAmount] = useState(false);
+  const [customName, setCustomName] = useState('');
+  const [customPrice, setCustomPrice] = useState('');
   const { items, addItem, removeItem, updateQty, getTotal, clear, tableId, tableName, switchTable, getTableItemCount } = useCartStore();
 
   useFocusEffect(
@@ -69,6 +73,24 @@ export default function PosScreen() {
     router.push('/(tabs)/pos/checkout');
   }, [items]);
 
+  const handleCustomAmountConfirm = useCallback(() => {
+    const price = parseFloat(customPrice);
+    if (isNaN(price) || price <= 0) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    addItem({
+      menuId: `custom-${Crypto.randomUUID()}`,
+      name: customName.trim() || 'รายการกำหนดเอง',
+      unitPrice: price,
+      quantity: 1,
+      selectedOptions: [],
+      note: '',
+      itemTotal: price,
+    });
+    setCustomName('');
+    setCustomPrice('');
+    setShowCustomAmount(false);
+  }, [customName, customPrice, addItem]);
+
   return (
     <SafeAreaView className="flex-1 bg-white">
       <View className={`flex-1 ${isTablet ? 'flex-row' : ''}`}>
@@ -82,16 +104,25 @@ export default function PosScreen() {
               resizeMode="contain"
             />
             <Text className="text-2xl font-bold text-mekha-text">Mekha</Text>
-            {tablesEnabled && tableName && (
-              <View className="bg-purple-100 px-3 py-1 rounded-full ml-auto">
-                <View className="flex-row items-center gap-1">
-                <Ionicons name="grid-outline" size={14} color="#7C3AED" />
-                <Text className="text-purple-700 text-sm font-medium">
-                  {tableName}
-                </Text>
-              </View>
-              </View>
-            )}
+            <View className="flex-row items-center gap-2 ml-auto">
+              <Pressable
+                className="bg-purple-50 px-3 py-1.5 rounded-full flex-row items-center gap-1"
+                onPress={() => setShowCustomAmount(true)}
+              >
+                <Ionicons name="add-circle-outline" size={16} color="#7C3AED" />
+                <Text className="text-purple-700 text-sm font-medium">กรอกราคา</Text>
+              </Pressable>
+              {tablesEnabled && tableName && (
+                <View className="bg-purple-100 px-3 py-1 rounded-full">
+                  <View className="flex-row items-center gap-1">
+                    <Ionicons name="grid-outline" size={14} color="#7C3AED" />
+                    <Text className="text-purple-700 text-sm font-medium">
+                      {tableName}
+                    </Text>
+                  </View>
+                </View>
+              )}
+            </View>
           </View>
 
           {/* Table selector */}
@@ -276,6 +307,51 @@ export default function PosScreen() {
         onClose={() => setSelectedMenu(null)}
         onAdd={addItem}
       />
+
+      {/* Custom Amount Modal */}
+      <Modal visible={showCustomAmount} animationType="fade" transparent>
+        <KeyboardAvoidingView className="flex-1" behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+          <TouchableWithoutFeedback onPress={() => setShowCustomAmount(false)}>
+            <View className="flex-1 bg-black/40 items-center justify-center">
+              <TouchableWithoutFeedback>
+                <View className="bg-white rounded-2xl p-5 mx-6 w-80">
+                  <Text className="text-lg font-bold text-mekha-text mb-4">กรอกราคาเอง</Text>
+                  <Text className="text-sm text-mekha-muted mb-1">ชื่อรายการ (ไม่บังคับ)</Text>
+                  <TextInput
+                    className="border border-mekha-border rounded-xl px-4 py-3 mb-3 text-mekha-text"
+                    placeholder="เช่น บริการเพิ่มเติม"
+                    placeholderTextColor="#9CA3AF"
+                    value={customName}
+                    onChangeText={setCustomName}
+                  />
+                  <Text className="text-sm text-mekha-muted mb-1">ราคา (฿) *</Text>
+                  <TextInput
+                    className="border border-mekha-border rounded-xl px-4 py-3 mb-4 text-mekha-text"
+                    placeholder="0"
+                    placeholderTextColor="#9CA3AF"
+                    value={customPrice}
+                    onChangeText={setCustomPrice}
+                    keyboardType="decimal-pad"
+                    autoFocus
+                  />
+                  <Pressable
+                    className={`py-3 rounded-xl items-center ${
+                      parseFloat(customPrice) > 0 ? 'bg-purple-600' : 'bg-purple-200'
+                    }`}
+                    onPress={handleCustomAmountConfirm}
+                    disabled={!(parseFloat(customPrice) > 0)}
+                  >
+                    <Text className="text-white font-semibold">เพิ่มเข้าตะกร้า</Text>
+                  </Pressable>
+                  <Pressable className="mt-3 items-center" onPress={() => setShowCustomAmount(false)}>
+                    <Text className="text-mekha-muted">ยกเลิก</Text>
+                  </Pressable>
+                </View>
+              </TouchableWithoutFeedback>
+            </View>
+          </TouchableWithoutFeedback>
+        </KeyboardAvoidingView>
+      </Modal>
     </SafeAreaView>
   );
 }
