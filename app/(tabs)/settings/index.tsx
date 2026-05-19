@@ -224,12 +224,14 @@ export default function SettingsScreen() {
 
         {/* General */}
         <SectionHeader title="ทั่วไป" />
+        <Text className="text-sm text-mekha-muted mb-1">ชื่อร้าน</Text>
         <TextInput
           className="bg-mekha-surface border border-mekha-border rounded-xl px-4 py-3 mb-3 text-mekha-text"
           placeholder="ชื่อร้าน"
           value={shopName}
           onChangeText={setShopName}
         />
+        <Text className="text-sm text-mekha-muted mb-1">VAT (%)</Text>
         <TextInput
           className="bg-mekha-surface border border-mekha-border rounded-xl px-4 py-3 mb-3 text-mekha-text"
           placeholder="อัตรา VAT (%)"
@@ -246,16 +248,18 @@ export default function SettingsScreen() {
 
         {/* Payment */}
         <SectionHeader title="การชำระเงิน" />
+        <Text className="text-sm text-mekha-muted mb-1">PromptPay ID</Text>
         <TextInput
           className="bg-mekha-surface border border-mekha-border rounded-xl px-4 py-3 mb-3 text-mekha-text"
-          placeholder="PromptPay ID (เบอร์โทร/บัตรประชาชน)"
+          placeholder="เบอร์โทร หรือ เลขบัตรประชาชน"
           value={promptpayId}
           onChangeText={setPromptpayId}
           keyboardType="phone-pad"
         />
+        <Text className="text-sm text-mekha-muted mb-1">Lightning Address</Text>
         <TextInput
           className="bg-mekha-surface border border-mekha-border rounded-xl px-4 py-3 mb-3 text-mekha-text"
-          placeholder="LN Address (user@domain.com)"
+          placeholder="user@domain.com"
           value={lnAddress}
           onChangeText={setLnAddress}
           autoCapitalize="none"
@@ -282,9 +286,10 @@ export default function SettingsScreen() {
 
         {!pinEnabled && (
           <View className="mb-3">
+            <Text className="text-sm text-mekha-muted mb-1">PIN เจ้าของร้าน</Text>
             <TextInput
               className="bg-mekha-surface border border-mekha-border rounded-xl px-4 py-3 mb-2 text-mekha-text"
-              placeholder="ตั้ง PIN เจ้าของร้าน (6 หลัก) แล้วเปิด Switch"
+              placeholder="6 หลัก"
               value={ownerPin}
               onChangeText={setOwnerPin}
               keyboardType="number-pad"
@@ -297,9 +302,10 @@ export default function SettingsScreen() {
 
         {pinEnabled && (
           <>
+            <Text className="text-sm text-mekha-muted mb-1">PIN แคชเชียร์</Text>
             <TextInput
               className="bg-mekha-surface border border-mekha-border rounded-xl px-4 py-3 mb-3 text-mekha-text"
-              placeholder="ตั้ง PIN แคชเชียร์ (6 หลัก)"
+              placeholder="6 หลัก"
               value={cashierPin}
               onChangeText={setCashierPin}
               keyboardType="number-pad"
