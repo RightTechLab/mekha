@@ -8,7 +8,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import * as Crypto from 'expo-crypto';
 import { useCartStore } from '../../../src/features/cart/cartStore';
-import { getAllMenus, getMenuCategories } from '../../../src/db/repositories/menuRepo';
+import { getAllMenus, getMenuCategories, getAllCategories } from '../../../src/db/repositories/menuRepo';
 import { getSetting } from '../../../src/db/repositories/transactionRepo';
 import { getAllTables } from '../../../src/db/repositories/tableRepo';
 import type { TableItem } from '../../../src/db/repositories/tableRepo';
@@ -32,7 +32,11 @@ export default function PosScreen() {
   useFocusEffect(
     useCallback(() => {
       setAllMenus(getAllMenus());
-      setCategories(getMenuCategories());
+      // Merge user-defined categories with categories found in menus
+      const menuCats = getMenuCategories();
+      const userCats = getAllCategories().map((c) => c.name);
+      const merged = [...new Set([...userCats, ...menuCats])];
+      setCategories(merged);
       const enabled = getSetting('tables_enabled') === '1';
       setTablesEnabled(enabled);
       if (enabled) {

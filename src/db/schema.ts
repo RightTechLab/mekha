@@ -88,4 +88,12 @@ CREATE TABLE IF NOT EXISTS tables (
   current_order_id TEXT,
   created_at  TEXT DEFAULT (datetime('now'))
 );
+
+CREATE TABLE IF NOT EXISTS categories (
+  id          TEXT PRIMARY KEY,
+  name        TEXT NOT NULL,
+  color       TEXT,
+  sort_order  INTEGER DEFAULT 0,
+  created_at  TEXT DEFAULT (datetime('now'))
+);
 `;

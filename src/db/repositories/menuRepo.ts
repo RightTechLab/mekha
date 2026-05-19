@@ -115,3 +115,40 @@ export function createOptionItem(item: OptionItem): void {
 export function deleteOptionItem(id: string): void {
   db.runSync('DELETE FROM option_items WHERE id = ?', [id]);
 }
+
+// Categories (user-defined)
+export interface CategoryItem {
+  id: string;
+  name: string;
+  color: string | null;
+  sort_order: number;
+  created_at?: string;
+}
+
+export function getAllCategories(): CategoryItem[] {
+  return db.getAllSync<CategoryItem>(
+    'SELECT * FROM categories ORDER BY sort_order, name'
+  );
+}
+
+export function createCategory(cat: Omit<CategoryItem, 'created_at'>): void {
+  db.runSync(
+    `INSERT INTO categories (id, name, color, sort_order) VALUES (?, ?, ?, ?)`,
+    [cat.id, cat.name, cat.color, cat.sort_order]
+  );
+}
+
+export function updateCategory(id: string, data: { name?: string; color?: string | null; sort_order?: number }): void {
+  const fields: string[] = [];
+  const values: (string | number | null)[] = [];
+  if (data.name !== undefined) { fields.push('name = ?'); values.push(data.name); }
+  if (data.color !== undefined) { fields.push('color = ?'); values.push(data.color); }
+  if (data.sort_order !== undefined) { fields.push('sort_order = ?'); values.push(data.sort_order); }
+  if (fields.length === 0) return;
+  values.push(id);
+  db.runSync(`UPDATE categories SET ${fields.join(', ')} WHERE id = ?`, values);
+}
+
+export function deleteCategory(id: string): void {
+  db.runSync('DELETE FROM categories WHERE id = ?', [id]);
+}
