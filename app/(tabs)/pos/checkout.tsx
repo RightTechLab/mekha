@@ -42,6 +42,7 @@ export default function CheckoutScreen() {
   const [customDiscountType, setCustomDiscountType] = useState<'percent' | 'fixed'>('percent');
   const [customerCount, setCustomerCount] = useState(1);
   const [splitMode, setSplitMode] = useState<'none' | 'equal' | 'items'>('none');
+  const [showSplitOptions, setShowSplitOptions] = useState(false);
   const [selectedUnitIndices, setSelectedUnitIndices] = useState<Set<number>>(new Set());
   const [paidUnitIndices, setPaidUnitIndices] = useState<Set<number>>(new Set());
   const [paidSplits, setPaidSplits] = useState<{ label: string; amount: number; method: PaymentMethod; amountSat: number | null; btcRate: number | null }[]>([]);
@@ -117,31 +118,42 @@ export default function CheckoutScreen() {
         setLnError('');
         setStep('lightning');
         try {
+          console.time('[LNURL] total');
           const lnAddress = await SecureStore.getItemAsync('mekha.ln_address');
           if (!lnAddress) {
             setLnError('ยังไม่ได้ตั้งค่า Lightning Address ในตั้งค่า');
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
             setLnLoading(false);
+            console.timeEnd('[LNURL] total');
             return;
           }
+          console.time('[LNURL] getBtcRateThb');
           const rate = await getBtcRateThb();
+          console.timeEnd('[LNURL] getBtcRateThb');
           const amountSat = thbToSats(payAmount, rate);
           const amountMsat = amountSat * 1000;
           setLnRate(rate);
           setLnAmountSat(amountSat);
 
+          console.time('[LNURL] fetchLnurlPayParams');
           const params = await fetchLnurlPayParams(lnAddress);
+          console.timeEnd('[LNURL] fetchLnurlPayParams');
           if (amountMsat < params.minSendable || amountMsat > params.maxSendable) {
             setLnError(`จำนวนเงินไม่อยู่ในช่วงที่รองรับ (${params.minSendable / 1000}-${params.maxSendable / 1000} sats)`);
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
             setLnLoading(false);
+            console.timeEnd('[LNURL] total');
             return;
           }
+          console.time('[LNURL] requestInvoice');
           const invoice = await requestInvoice(params.callback, amountMsat);
+          console.timeEnd('[LNURL] requestInvoice');
           setLnInvoice(invoice);
+          console.timeEnd('[LNURL] total');
         } catch (e: any) {
           setLnError(e?.message ?? 'ไม่สามารถสร้าง Invoice ได้');
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+          console.timeEnd('[LNURL] total');
         } finally {
           setLnLoading(false);
         }
@@ -679,9 +691,17 @@ export default function CheckoutScreen() {
 
   const paymentContent = (
     <>
-      {/* Split Bill Mode */}
+      {/* Split Bill Mode - collapsed by default */}
       <View className="mt-4 mb-4">
-        <Text className="text-base font-semibold text-mekha-text mb-3">แบ่งจ่าย</Text>
+        <Pressable
+          className="flex-row items-center justify-between mb-3"
+          onPress={() => setShowSplitOptions(!showSplitOptions)}
+        >
+          <Text className="text-base font-semibold text-mekha-text">ตัวเลือกเพิ่มเติม</Text>
+          <Ionicons name={showSplitOptions ? 'chevron-up' : 'chevron-down'} size={18} color="#6B7280" />
+        </Pressable>
+        {showSplitOptions && (
+          <>
         <View className="flex-row gap-2 mb-3">
           {([
             { mode: 'none' as const, label: 'ไม่แบ่ง' },
@@ -841,6 +861,8 @@ export default function CheckoutScreen() {
               </View>
             )}
           </View>
+        )}
+          </>
         )}
       </View>
 
