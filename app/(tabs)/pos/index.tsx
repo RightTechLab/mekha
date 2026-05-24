@@ -259,7 +259,7 @@ export default function PosScreen() {
               horizontal
               showsHorizontalScrollIndicator={false}
               className="px-4 pb-2 max-h-11"
-              contentContainerStyle={{ gap: 8, alignItems: 'center' }}
+              contentContainerStyle={{ gap: 8, alignItems: 'center', paddingRight: 16 }}
             >
               <Pressable
                 className={`px-3 py-1.5 rounded-full ${
@@ -317,7 +317,7 @@ export default function PosScreen() {
             horizontal
             showsHorizontalScrollIndicator={false}
             className="px-4 pb-3 max-h-12"
-            contentContainerStyle={{ gap: 8, alignItems: 'center' }}
+            contentContainerStyle={{ gap: 8, alignItems: 'center', paddingRight: 16 }}
           >
             <Pressable
               className={`px-4 py-2 rounded-full ${
