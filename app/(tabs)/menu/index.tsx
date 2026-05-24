@@ -4,6 +4,7 @@ import { router } from 'expo-router';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { FlashList } from '@shopify/flash-list';
+import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import * as Crypto from 'expo-crypto';
 import {
@@ -26,7 +27,6 @@ export default function MenuScreen() {
   const [name, setName] = useState('');
   const [price, setPrice] = useState('');
   const [category, setCategory] = useState('');
-  const [showCatSuggest, setShowCatSuggest] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
   const [menus, setMenus] = useState<Menu[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
@@ -185,39 +185,48 @@ export default function MenuScreen() {
             onChangeText={setPrice}
             keyboardType="decimal-pad"
           />
-          <View>
-            <TextInput
-              className="bg-white border border-mekha-border rounded-xl px-4 py-3 mb-1 text-mekha-text"
-              placeholder="หมวดหมู่ (ไม่บังคับ)"
-              value={category}
-              onChangeText={(text) => {
-                setCategory(text);
-                setShowCatSuggest(true);
-              }}
-              onFocus={() => setShowCatSuggest(true)}
-              onBlur={() => setTimeout(() => setShowCatSuggest(false), 200)}
-            />
-            {showCatSuggest && (() => {
-              const allCats = [...new Set([...userCategories.map((c) => c.name), ...categories])];
-              const filtered = allCats.filter((c) => c.toLowerCase().includes(category.toLowerCase()));
-              if (filtered.length === 0) return null;
-              return (
-              <View className="bg-white border border-mekha-border rounded-xl mb-2 overflow-hidden">
-                {filtered.map((c) => (
-                    <Pressable
-                      key={c}
-                      className="px-4 py-2.5 border-b border-mekha-border active:bg-purple-50"
-                      onPress={() => {
-                        setCategory(c);
-                        setShowCatSuggest(false);
-                      }}
-                    >
-                      <Text className="text-sm text-mekha-text">{c}</Text>
-                    </Pressable>
-                  ))}
+          {/* Category dropdown */}
+          <View className="mb-3">
+            <Text className="text-sm text-mekha-muted mb-1.5">หมวดหมู่</Text>
+            {userCategories.length > 0 ? (
+              <View className="bg-white border border-mekha-border rounded-xl overflow-hidden">
+                <ScrollView horizontal={false} style={{ maxHeight: 180 }}>
+                  {userCategories.map((cat) => {
+                    const isSelected = category === cat.name;
+                    return (
+                      <Pressable
+                        key={cat.id}
+                        className={`px-4 py-3 border-b border-mekha-border ${
+                          isSelected ? 'bg-purple-50' : ''
+                        }`}
+                        onPress={() => setCategory(isSelected ? '' : cat.name)}
+                      >
+                        <View className="flex-row items-center justify-between">
+                          <Text className={`text-sm ${isSelected ? 'text-purple-700 font-semibold' : 'text-mekha-text'}`}>
+                            {cat.name}
+                          </Text>
+                          {isSelected && (
+                            <Ionicons name="checkmark-circle" size={18} color="#7C3AED" />
+                          )}
+                        </View>
+                      </Pressable>
+                    );
+                  })}
+                </ScrollView>
               </View>
-              );
-            })()}
+            ) : (
+              <Pressable
+                className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3"
+                onPress={() => { setShowCatManage(true); setShowAdd(false); }}
+              >
+                <Text className="text-amber-700 text-sm text-center">
+                  ยังไม่มีหมวดหมู่ — กดเพื่อสร้างก่อน
+                </Text>
+              </Pressable>
+            )}
+            {category ? (
+              <Text className="text-xs text-purple-600 mt-1">เลือก: {category}</Text>
+            ) : null}
           </View>
           <Pressable
             className="bg-purple-600 py-3 rounded-xl items-center"

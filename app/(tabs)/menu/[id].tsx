@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { View, Text, Pressable, TextInput, ScrollView, Image, Alert, KeyboardAvoidingView, Platform } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import * as Crypto from 'expo-crypto';
 import * as ImagePicker from 'expo-image-picker';
@@ -13,11 +14,14 @@ import {
   createOptionGroup,
   createOptionItem,
   deleteOptionGroup,
+  getAllCategories,
 } from '../../../src/db/repositories/menuRepo';
+import type { CategoryItem } from '../../../src/db/repositories/menuRepo';
 
 export default function MenuDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const menu = getMenuById(id);
+  const allCategories: CategoryItem[] = getAllCategories();
   const insets = useSafeAreaInsets();
 
   const [name, setName] = useState(menu?.name ?? '');
@@ -138,12 +142,47 @@ export default function MenuDetailScreen() {
           onChangeText={setPrice}
           keyboardType="decimal-pad"
         />
-        <TextInput
-          className="bg-mekha-surface border border-mekha-border rounded-xl px-4 py-3 mb-3 text-mekha-text"
-          placeholder="หมวดหมู่"
-          value={category}
-          onChangeText={setCategory}
-        />
+
+        {/* Category dropdown */}
+        <View className="mb-3">
+          <Text className="text-sm text-mekha-muted mb-1.5">หมวดหมู่</Text>
+          {allCategories.length > 0 ? (
+            <View className="bg-mekha-surface border border-mekha-border rounded-xl overflow-hidden">
+              <ScrollView horizontal={false} style={{ maxHeight: 150 }} nestedScrollEnabled>
+                {allCategories.map((cat) => {
+                  const isSelected = category === cat.name;
+                  return (
+                    <Pressable
+                      key={cat.id}
+                      className={`px-4 py-3 border-b border-mekha-border ${
+                        isSelected ? 'bg-purple-50' : ''
+                      }`}
+                      onPress={() => setCategory(isSelected ? '' : cat.name)}
+                    >
+                      <View className="flex-row items-center justify-between">
+                        <Text className={`text-sm ${isSelected ? 'text-purple-700 font-semibold' : 'text-mekha-text'}`}>
+                          {cat.name}
+                        </Text>
+                        {isSelected && (
+                          <Ionicons name="checkmark-circle" size={18} color="#7C3AED" />
+                        )}
+                      </View>
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
+            </View>
+          ) : (
+            <View className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
+              <Text className="text-amber-700 text-sm text-center">
+                ยังไม่มีหมวดหมู่ — ไปสร้างที่หน้าจัดการเมนูก่อน
+              </Text>
+            </View>
+          )}
+          {category ? (
+            <Text className="text-xs text-purple-600 mt-1">เลือก: {category}</Text>
+          ) : null}
+        </View>
 
         {/* Image Picker */}
         {imagePath && (
