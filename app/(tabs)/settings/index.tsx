@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { View, Text, Pressable, TextInput, ScrollView, Alert, Switch } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as SecureStore from 'expo-secure-store';
@@ -25,6 +25,12 @@ export default function SettingsScreen() {
   const [vatRate, setVatRate] = useState(getSetting('vat_rate') ?? '7');
   const [promptpayId, setPromptpayId] = useState('');
   const [lnAddress, setLnAddress] = useState('');
+
+  // Track dirty state for save buttons
+  const initGeneral = useRef({ shopName: getSetting('shop_name') ?? 'Mekha', vatRate: getSetting('vat_rate') ?? '7' });
+  const [initPayment, setInitPayment] = useState({ promptpayId: '', lnAddress: '' });
+  const isGeneralDirty = shopName !== initGeneral.current.shopName || vatRate !== initGeneral.current.vatRate;
+  const isPaymentDirty = promptpayId !== initPayment.promptpayId || lnAddress !== initPayment.lnAddress;
   const [cashierPin, setCashierPin] = useState('');
   const [ownerPin, setOwnerPin] = useState('');
   const [pinEnabled, setPinEnabled] = useState(getSetting('pin_enabled') === '1');
@@ -37,16 +43,18 @@ export default function SettingsScreen() {
   // Load secure values
   useState(() => {
     SecureStore.getItemAsync('mekha.promptpay_id').then((v) => {
-      if (v) setPromptpayId(v);
+      if (v) { setPromptpayId(v); setInitPayment((prev) => ({ ...prev, promptpayId: v })); }
     });
     SecureStore.getItemAsync('mekha.ln_address').then((v) => {
-      if (v) setLnAddress(v);
+      if (v) { setLnAddress(v); setInitPayment((prev) => ({ ...prev, lnAddress: v })); }
     });
   });
 
   const handleSaveGeneral = () => {
     setSetting('shop_name', shopName.trim());
     setSetting('vat_rate', vatRate);
+    initGeneral.current = { shopName: shopName.trim(), vatRate };
+    setShopName(shopName.trim());
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
   };
 
@@ -90,6 +98,7 @@ export default function SettingsScreen() {
     if (lnAddress.trim()) {
       await SecureStore.setItemAsync('mekha.ln_address', lnAddress.trim());
     }
+    setInitPayment({ promptpayId: promptpayId.trim(), lnAddress: lnAddress.trim() });
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
   };
 
@@ -243,10 +252,11 @@ export default function SettingsScreen() {
           keyboardType="decimal-pad"
         />
         <Pressable
-          className="bg-purple-600 py-3 rounded-xl items-center mb-6"
+          className={`py-3 rounded-xl items-center mb-6 ${isGeneralDirty ? 'bg-purple-600' : 'bg-gray-300'}`}
           onPress={handleSaveGeneral}
+          disabled={!isGeneralDirty}
         >
-          <Text className="text-white font-semibold">บันทึก</Text>
+          <Text className={`font-semibold ${isGeneralDirty ? 'text-white' : 'text-gray-500'}`}>บันทึก</Text>
         </Pressable>
 
         {/* Payment */}
@@ -269,10 +279,11 @@ export default function SettingsScreen() {
           keyboardType="email-address"
         />
         <Pressable
-          className="bg-purple-600 py-3 rounded-xl items-center mb-6"
+          className={`py-3 rounded-xl items-center mb-6 ${isPaymentDirty ? 'bg-purple-600' : 'bg-gray-300'}`}
           onPress={handleSavePayment}
+          disabled={!isPaymentDirty}
         >
-          <Text className="text-white font-semibold">บันทึกการชำระเงิน</Text>
+          <Text className={`font-semibold ${isPaymentDirty ? 'text-white' : 'text-gray-500'}`}>บันทึกการชำระเงิน</Text>
         </Pressable>
 
         {/* Roles & PIN */}
