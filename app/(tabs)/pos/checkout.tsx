@@ -220,7 +220,7 @@ export default function CheckoutScreen() {
         addOrderItem({
           id: Crypto.randomUUID(),
           order_id: orderId,
-          menu_id: item.menuId,
+          menu_id: item.menuId.startsWith('custom-') ? null : item.menuId,
           menu_name: item.name,
           unit_price: item.unitPrice,
           quantity: item.quantity,

@@ -48,7 +48,7 @@ export interface Order {
 export interface OrderItem {
   id: string;
   order_id: string;
-  menu_id: string;
+  menu_id: string | null;
   menu_name: string;
   unit_price: number;
   quantity: number;
