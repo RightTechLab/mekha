@@ -30,6 +30,14 @@ export async function fetchLnurlPayParams(
     throw new Error('Invalid LNURL response: not a payRequest');
   }
 
+  if (!data.callback || typeof data.callback !== 'string') {
+    throw new Error('Invalid LNURL response: missing callback URL');
+  }
+
+  if (typeof data.minSendable !== 'number' || typeof data.maxSendable !== 'number') {
+    throw new Error('Invalid LNURL response: missing min/maxSendable');
+  }
+
   return data as LnurlPayResponse;
 }
 
@@ -37,7 +45,11 @@ export async function requestInvoice(
   callbackUrl: string,
   amountMsat: number
 ): Promise<string> {
-  const url = `${callbackUrl}${callbackUrl.includes('?') ? '&' : '?'}amount=${amountMsat}`;
+  if (!callbackUrl) {
+    throw new Error('Missing callback URL for invoice request');
+  }
+  const separator = callbackUrl.includes('?') ? '&' : '?';
+  const url = `${callbackUrl}${separator}amount=${amountMsat}`;
   const res = await fetch(url);
   if (!res.ok) {
     throw new Error(`Invoice request failed: ${res.status}`);

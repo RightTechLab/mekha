@@ -15,14 +15,17 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.mekha.pos"
+      "bundleIdentifier": "com.pos.mekha",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#7C3AED"
       },
-      "package": "com.rightshift.mekha",
+      "package": "com.pos.mekha",
       "edgeToEdgeEnabled": true
     },
     "web": {
