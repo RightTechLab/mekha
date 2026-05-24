@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { View, Text, Pressable, TextInput, ScrollView, Image, Alert, KeyboardAvoidingView, Platform } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import * as Crypto from 'expo-crypto';
 import * as ImagePicker from 'expo-image-picker';
@@ -18,6 +18,7 @@ import {
 export default function MenuDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const menu = getMenuById(id);
+  const insets = useSafeAreaInsets();
 
   const [name, setName] = useState(menu?.name ?? '');
   const [price, setPrice] = useState(menu?.price.toString() ?? '');
@@ -114,9 +115,9 @@ export default function MenuDetailScreen() {
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-white">
+    <SafeAreaView className="flex-1 bg-white" edges={['top']}>
       <KeyboardAvoidingView className="flex-1" behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <ScrollView className="flex-1 px-6 pt-6" keyboardShouldPersistTaps="handled">
+      <ScrollView className="flex-1 px-6 pt-6" keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: insets.bottom + 80 }}>
         <View className="flex-row items-center justify-between mb-6">
           <Text className="text-xl font-bold text-mekha-text">แก้ไขเมนู</Text>
           <Pressable onPress={() => router.back()}>

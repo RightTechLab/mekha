@@ -221,7 +221,7 @@ export default function SettingsScreen() {
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-white">
+    <SafeAreaView className="flex-1 bg-white" edges={['top']}>
       <ScrollView className="flex-1 px-4 pt-4" contentContainerStyle={{ paddingBottom: insets.bottom + 80 }}>
         <Text className="text-2xl font-bold text-mekha-text mb-6">ตั้งค่า</Text>
 

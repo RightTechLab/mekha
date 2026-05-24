@@ -74,7 +74,7 @@ export default function TransactionsScreen() {
   const totalFiltered = transactions.reduce((sum, t) => sum + t.amount_thb, 0);
 
   return (
-    <SafeAreaView className="flex-1 bg-white">
+    <SafeAreaView className="flex-1 bg-white" edges={['top']}>
       <View className="px-4 pt-4 pb-2">
         <Text className="text-2xl font-bold text-mekha-text">ธุรกรรม</Text>
       </View>

@@ -108,7 +108,7 @@ export default function MenuScreen() {
   }, []);
 
   return (
-    <SafeAreaView className="flex-1 bg-white">
+    <SafeAreaView className="flex-1 bg-white" edges={['top']}>
       <View className="px-4 pt-4 pb-2 flex-row items-center justify-between">
         <Text className="text-2xl font-bold text-mekha-text">จัดการเมนู</Text>
         <View className="flex-row gap-2">

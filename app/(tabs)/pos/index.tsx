@@ -130,7 +130,7 @@ export default function PosScreen() {
 
 
   return (
-    <SafeAreaView className="flex-1 bg-white">
+    <SafeAreaView className="flex-1 bg-white" edges={['top']}>
       <View className={`flex-1 ${isTablet ? 'flex-row' : ''}`}>
         {/* Menu Grid */}
         <View className={`${isTablet ? 'flex-1' : 'flex-1'}`}>

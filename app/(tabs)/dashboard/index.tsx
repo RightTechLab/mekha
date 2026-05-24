@@ -82,7 +82,7 @@ export default function DashboardScreen() {
   const methodLabel = PAYMENT_FILTERS.find((f) => f.value === selectedMethod)?.label ?? 'ทั้งหมด';
 
   return (
-    <SafeAreaView className="flex-1 bg-white">
+    <SafeAreaView className="flex-1 bg-white" edges={['top']}>
       <ScrollView className="flex-1 px-4 pt-4" contentContainerStyle={{ paddingBottom: insets.bottom + 80 }}>
         <Text className="text-2xl font-bold text-mekha-text mb-4">Dashboard</Text>
 
