@@ -60,9 +60,11 @@ export default function CheckoutScreen() {
   const vatAmount = vatIncluded
     ? afterDiscount - afterDiscount / (1 + vatRate / 100)
     : afterDiscount * (vatRate / 100);
+  // finalTotal = amount the customer actually pays
+  const finalTotal = vatIncluded ? afterDiscount : afterDiscount + vatAmount;
 
   // Split bill calculations
-  const splitPerPerson = customerCount > 1 ? total / customerCount : total;
+  const splitPerPerson = customerCount > 1 ? finalTotal / customerCount : finalTotal;
 
   // Expand items into individual units for split-by-items
   const expandedUnits = items.flatMap((item, itemIdx) =>
@@ -83,19 +85,19 @@ export default function CheckoutScreen() {
     0
   );
   const totalPaid = paidSplits.reduce((sum, s) => sum + s.amount, 0);
-  const remaining = total - totalPaid;
+  const remaining = finalTotal - totalPaid;
   const currentPayAmount =
     splitMode === 'equal'
       ? splitPerPerson
       : splitMode === 'items'
         ? selectedItemsTotal
-        : total;
+        : finalTotal;
 
   const getPayableAmount = () => {
-    if (splitMode === 'none') return total;
+    if (splitMode === 'none') return finalTotal;
     if (splitMode === 'equal') return Math.min(splitPerPerson, remaining);
     if (splitMode === 'items') return selectedItemsTotal;
-    return total;
+    return finalTotal;
   };
 
   const handlePayment = useCallback(
@@ -165,7 +167,7 @@ export default function CheckoutScreen() {
         }
       }
     },
-    [total, splitMode, splitPerPerson, remaining, selectedItemsTotal]
+    [finalTotal, splitMode, splitPerPerson, remaining, selectedItemsTotal]
   );
 
   const recordSplitPayment = useCallback(
@@ -190,13 +192,13 @@ export default function CheckoutScreen() {
       setSelectedUnitIndices(new Set());
 
       const newTotalPaid = newSplits.reduce((sum, s) => sum + s.amount, 0);
-      if (newTotalPaid >= total - 0.01) {
+      if (newTotalPaid >= finalTotal - 0.01) {
         completeOrder(method, undefined, newSplits);
       } else {
         setStep('summary');
       }
     },
-    [splitMode, paidSplits, selectedUnitIndices, expandedUnits, paidUnitIndices, total]
+    [splitMode, paidSplits, selectedUnitIndices, expandedUnits, paidUnitIndices, finalTotal]
   );
 
   const completeOrder = useCallback(
@@ -257,7 +259,7 @@ export default function CheckoutScreen() {
         }
         // Last split (current payment) — only if remaining after all recorded splits
         const splitTotal = splits.reduce((sum, s) => sum + s.amount, 0);
-        const leftover = total - splitTotal;
+        const leftover = finalTotal - splitTotal;
         if (leftover > 0.01) {
           createTransaction({
             id: Crypto.randomUUID(),
@@ -283,7 +285,7 @@ export default function CheckoutScreen() {
           id: Crypto.randomUUID(),
           order_id: orderId,
           payment_method: method,
-          amount_thb: total,
+          amount_thb: finalTotal,
           amount_sat: extra?.amountSat ?? null,
           btc_rate_thb: extra?.btcRate ?? null,
           discount_amount: discountAmount,
@@ -302,7 +304,7 @@ export default function CheckoutScreen() {
       clear();
       setStep('done');
     },
-    [items, total, discountAmount, vatAmount, vatIncluded, role, clear, paidSplits, remaining, tableId]
+    [items, finalTotal, discountAmount, vatAmount, vatIncluded, role, clear, paidSplits, remaining, tableId]
   );
 
   if (step === 'done') {
@@ -328,7 +330,7 @@ export default function CheckoutScreen() {
   }
 
   if (step === 'cash') {
-    const payAmount = splitMode !== 'none' ? getPayableAmount() : total;
+    const payAmount = splitMode !== 'none' ? getPayableAmount() : finalTotal;
     const received = parseFloat(receivedAmount) || 0;
     const change = received - payAmount;
     const canConfirm = received > 0 && received >= payAmount - 0.01;
@@ -405,7 +407,7 @@ export default function CheckoutScreen() {
   }
 
   if (step === 'promptpay') {
-    const payAmount = splitMode !== 'none' ? getPayableAmount() : total;
+    const payAmount = splitMode !== 'none' ? getPayableAmount() : finalTotal;
     return (
       <SafeAreaView className="flex-1 bg-white items-center justify-center px-8">
         <Text className="text-xl font-bold text-mekha-text mb-2">PromptPay</Text>
@@ -440,7 +442,7 @@ export default function CheckoutScreen() {
   }
 
   if (step === 'lightning') {
-    const payAmount = splitMode !== 'none' ? getPayableAmount() : total;
+    const payAmount = splitMode !== 'none' ? getPayableAmount() : finalTotal;
     return (
       <SafeAreaView className="flex-1 bg-white items-center justify-center px-8">
         <Text className="text-xl font-bold text-mekha-text mb-2">Lightning</Text>
@@ -893,7 +895,7 @@ export default function CheckoutScreen() {
         </View>
         <View className="flex-row justify-between mt-2 pt-2 border-t border-mekha-border">
           <Text className="text-lg font-bold text-mekha-text">ยอดชำระ</Text>
-          <Text className="text-lg font-bold text-purple-600">฿{total.toFixed(2)}</Text>
+          <Text className="text-lg font-bold text-purple-600">฿{finalTotal.toFixed(2)}</Text>
         </View>
         {totalPaid > 0 && (
           <View className="flex-row justify-between mt-1">
@@ -901,7 +903,7 @@ export default function CheckoutScreen() {
             <Text className="text-sm font-semibold text-green-700">฿{totalPaid.toFixed(2)}</Text>
           </View>
         )}
-        {splitMode !== 'none' && remaining > 0 && remaining < total && (
+        {splitMode !== 'none' && remaining > 0 && remaining < finalTotal && (
           <View className="flex-row justify-between mt-1">
             <Text className="text-sm text-red-600 font-semibold">คงเหลือ</Text>
             <Text className="text-sm font-bold text-red-600">฿{remaining.toFixed(2)}</Text>
