@@ -46,7 +46,7 @@ export default function CheckoutScreen() {
   const [showSplitOptions, setShowSplitOptions] = useState(false);
   const [selectedUnitIndices, setSelectedUnitIndices] = useState<Set<number>>(new Set());
   const [paidUnitIndices, setPaidUnitIndices] = useState<Set<number>>(new Set());
-  const [paidSplits, setPaidSplits] = useState<{ label: string; amount: number; method: PaymentMethod; amountSat: number | null; btcRate: number | null }[]>([]);
+  const [paidSplits, setPaidSplits] = useState<{ label: string; amount: number; method: PaymentMethod; amountSat: number | null; btcRate: number | null; invoice: string | null; qrRef: string | null }[]>([]);
 
   const total = getTotal();
   const subtotal = getSubtotal();
@@ -181,7 +181,15 @@ export default function CheckoutScreen() {
         const selectedNames = Array.from(selectedUnitIndices).map((i) => expandedUnits[i]?.name).filter(Boolean);
         label = `${selectedNames.join(', ')} (${method})`;
       }
-      const newSplits = [...paidSplits, { label, amount: payAmount, method, amountSat: extra?.amountSat ?? null, btcRate: extra?.btcRate ?? null }];
+      const newSplits = [...paidSplits, {
+        label,
+        amount: payAmount,
+        method,
+        amountSat: extra?.amountSat ?? null,
+        btcRate: extra?.btcRate ?? null,
+        invoice: method === 'lightning' ? lnInvoice : null,
+        qrRef: method === 'promptpay' ? qrData : null,
+      }];
       setPaidSplits(newSplits);
 
       // Mark selected units as paid
@@ -199,7 +207,7 @@ export default function CheckoutScreen() {
         setStep('summary');
       }
     },
-    [splitMode, paidSplits, selectedUnitIndices, expandedUnits, paidUnitIndices, finalTotal]
+    [splitMode, paidSplits, selectedUnitIndices, expandedUnits, paidUnitIndices, finalTotal, lnInvoice, qrData]
   );
 
   const completeOrder = useCallback(
@@ -251,9 +259,9 @@ export default function CheckoutScreen() {
             vat_amount: 0,
             vat_included: vatIncluded ? 1 : 0,
             status: 'completed',
-            lightning_invoice: split.method === 'lightning' ? lnInvoice : null,
+            lightning_invoice: split.invoice ?? (split.method === 'lightning' ? lnInvoice : null),
             lightning_preimage: null,
-            promptpay_ref: split.method === 'promptpay' ? qrData : null,
+            promptpay_ref: split.qrRef ?? (split.method === 'promptpay' ? qrData : null),
             cashier_id: role,
             void_reason: null,
           });
@@ -305,7 +313,7 @@ export default function CheckoutScreen() {
       clear();
       setStep('done');
     },
-    [items, finalTotal, discountAmount, vatAmount, vatIncluded, role, clear, paidSplits, remaining, tableId]
+    [items, finalTotal, discountAmount, vatAmount, vatIncluded, role, clear, paidSplits, remaining, tableId, lnInvoice, qrData]
   );
 
   if (step === 'done') {
