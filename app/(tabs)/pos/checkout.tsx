@@ -101,7 +101,10 @@ export default function CheckoutScreen() {
   const handlePayment = useCallback(
     async (method: PaymentMethod) => {
       const payAmount = getPayableAmount();
-      if (payAmount <= 0) return;
+      if (payAmount <= 0) {
+        Alert.alert('ไม่สามารถชำระได้', 'ยอดชำระต้องมากกว่า 0');
+        return;
+      }
 
       await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
@@ -109,7 +112,10 @@ export default function CheckoutScreen() {
         setStep('cash');
       } else if (method === 'promptpay') {
         const promptpayId = await SecureStore.getItemAsync('mekha.promptpay_id');
-        if (!promptpayId) return;
+        if (!promptpayId) {
+          Alert.alert('ยังไม่ได้ตั้งค่า', 'กรุณาตั้งค่า PromptPay ID ในหน้าตั้งค่าก่อน');
+          return;
+        }
         const qr = generatePromptPayQR(promptpayId, payAmount);
         setQrData(qr);
         setStep('promptpay');
@@ -325,6 +331,7 @@ export default function CheckoutScreen() {
     const payAmount = splitMode !== 'none' ? getPayableAmount() : total;
     const received = parseFloat(receivedAmount) || 0;
     const change = received - payAmount;
+    const canConfirm = received > 0 && received >= payAmount - 0.01;
 
     return (
       <SafeAreaView className="flex-1 bg-white px-6 pt-8">
@@ -340,8 +347,8 @@ export default function CheckoutScreen() {
         </View>
 
         <View className="bg-green-50 rounded-2xl px-4 py-3 mb-6">
-          <Text className={`font-semibold ${received >= payAmount ? 'text-green-700' : 'text-gray-400'}`}>
-            เงินทอน: {received >= payAmount ? `฿${change.toFixed(2)}` : '฿ —'}
+          <Text className={`font-semibold ${canConfirm ? 'text-green-700' : 'text-gray-400'}`}>
+            เงินทอน: {canConfirm ? `฿${Math.max(0, change).toFixed(2)}` : '฿ —'}
           </Text>
         </View>
 
@@ -375,7 +382,7 @@ export default function CheckoutScreen() {
 
         <Pressable
           className={`mt-4 w-full py-4 rounded-2xl items-center ${
-            received >= payAmount ? 'bg-purple-600' : 'bg-purple-200'
+            canConfirm ? 'bg-purple-600' : 'bg-purple-200'
           }`}
           onPress={() => {
             if (splitMode !== 'none') {
@@ -385,7 +392,7 @@ export default function CheckoutScreen() {
               completeOrder('cash');
             }
           }}
-          disabled={received < payAmount}
+          disabled={!canConfirm}
         >
           <Text className="text-white font-semibold">ยืนยัน</Text>
         </Pressable>
