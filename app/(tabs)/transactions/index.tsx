@@ -257,16 +257,21 @@ function TransactionCard({ txn }: { txn: Transaction }) {
       {expanded && items.length === 0 && (
         <Text className="text-xs text-mekha-muted mt-2 italic">ไม่มีรายละเอียด</Text>
       )}
-      {expanded && txn.status === 'completed' && (txn.payment_method === 'promptpay' || txn.payment_method === 'lightning') && (
+      {expanded && txn.status === 'completed' && !isSplitGroup && (txn.payment_method === 'promptpay' || txn.payment_method === 'lightning') && (
         <Pressable
           className="mt-3 bg-purple-50 py-2 rounded-xl items-center"
           onPress={async (e) => {
             e.stopPropagation?.();
             if (txn.payment_method === 'promptpay') {
-              const promptpayId = await SecureStore.getItemAsync('mekha.promptpay_id');
-              if (promptpayId) {
-                setQrData(generatePromptPayQR(promptpayId, txn.amount_thb));
+              if (txn.promptpay_ref) {
+                setQrData(txn.promptpay_ref);
                 setShowQr(true);
+              } else {
+                const promptpayId = await SecureStore.getItemAsync('mekha.promptpay_id');
+                if (promptpayId) {
+                  setQrData(generatePromptPayQR(promptpayId, txn.amount_thb));
+                  setShowQr(true);
+                }
               }
             } else if (txn.payment_method === 'lightning' && txn.lightning_invoice) {
               setQrData(txn.lightning_invoice);
@@ -276,6 +281,38 @@ function TransactionCard({ txn }: { txn: Transaction }) {
         >
           <Text className="text-sm font-medium text-purple-700">แสดง QR อีกครั้ง</Text>
         </Pressable>
+      )}
+      {expanded && isSplitGroup && splitTxns.filter((st) => st.payment_method === 'promptpay' || st.payment_method === 'lightning').length > 0 && (
+        <View className="mt-3">
+          {splitTxns.filter((st) => st.payment_method === 'promptpay' || st.payment_method === 'lightning').map((st) => (
+            <Pressable
+              key={st.id}
+              className="bg-purple-50 py-2 rounded-xl items-center mb-1"
+              onPress={async (e) => {
+                e.stopPropagation?.();
+                if (st.payment_method === 'promptpay') {
+                  if (st.promptpay_ref) {
+                    setQrData(st.promptpay_ref);
+                    setShowQr(true);
+                  } else {
+                    const promptpayId = await SecureStore.getItemAsync('mekha.promptpay_id');
+                    if (promptpayId) {
+                      setQrData(generatePromptPayQR(promptpayId, st.amount_thb));
+                      setShowQr(true);
+                    }
+                  }
+                } else if (st.payment_method === 'lightning' && st.lightning_invoice) {
+                  setQrData(st.lightning_invoice);
+                  setShowQr(true);
+                }
+              }}
+            >
+              <Text className="text-sm font-medium text-purple-700">
+                QR {METHOD_LABELS[st.payment_method]} ฿{st.amount_thb.toFixed(2)}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
       )}
       {showQr && (
         <Modal visible={showQr} animationType="fade" transparent>
