@@ -127,42 +127,31 @@ export default function CheckoutScreen() {
         setLnError('');
         setStep('lightning');
         try {
-          console.time('[LNURL] total');
           const lnAddress = await SecureStore.getItemAsync('mekha.ln_address');
           if (!lnAddress) {
             setLnError('ยังไม่ได้ตั้งค่า Lightning Address ในตั้งค่า');
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
             setLnLoading(false);
-            console.timeEnd('[LNURL] total');
             return;
           }
-          console.time('[LNURL] getBtcRateThb');
           const rate = await getBtcRateThb();
-          console.timeEnd('[LNURL] getBtcRateThb');
           const amountSat = thbToSats(payAmount, rate);
           const amountMsat = amountSat * 1000;
           setLnRate(rate);
           setLnAmountSat(amountSat);
 
-          console.time('[LNURL] fetchLnurlPayParams');
           const params = await fetchLnurlPayParams(lnAddress);
-          console.timeEnd('[LNURL] fetchLnurlPayParams');
           if (amountMsat < params.minSendable || amountMsat > params.maxSendable) {
             setLnError(`จำนวนเงินไม่อยู่ในช่วงที่รองรับ (${params.minSendable / 1000}-${params.maxSendable / 1000} sats)`);
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
             setLnLoading(false);
-            console.timeEnd('[LNURL] total');
             return;
           }
-          console.time('[LNURL] requestInvoice');
           const invoice = await requestInvoice(params.callback, amountMsat);
-          console.timeEnd('[LNURL] requestInvoice');
           setLnInvoice(invoice);
-          console.timeEnd('[LNURL] total');
         } catch (e: any) {
           setLnError(e?.message ?? 'ไม่สามารถสร้าง Invoice ได้');
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-          console.timeEnd('[LNURL] total');
         } finally {
           setLnLoading(false);
         }
