@@ -14,6 +14,7 @@ import { getAllTables } from '../../../src/db/repositories/tableRepo';
 import type { TableItem } from '../../../src/db/repositories/tableRepo';
 import { isTablet } from '../../../src/constants/layout';
 import AddToCartModal from '../../../src/components/AddToCartModal';
+import NumPad from '../../../src/components/NumPad';
 import type { Menu, CartItem } from '../../../src/types';
 
 export default function PosScreen() {
@@ -29,33 +30,23 @@ export default function PosScreen() {
   const [keypadNote, setKeypadNote] = useState('');
   const { items, addItem, removeItem, updateQty, getTotal, clear, tableId, tableName, switchTable, getTableItemCount } = useCartStore();
 
-  // Keypad amount (digits are in cents, e.g. "1250" = ฿12.50)
-  const keypadAmount = parseFloat(keypadDigits || '0') / 100;
+  // Keypad amount (direct entry: "50" = ฿50, "12.5" = ฿12.50)
+  const keypadAmount = parseFloat(keypadDigits || '0') || 0;
 
-  const handleKeypadPress = useCallback((key: string) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    if (key === 'C') {
+  const handleKeypadAdd = useCallback(() => {
+    if (keypadAmount > 0) {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      addItem({
+        menuId: `custom-${Crypto.randomUUID()}`,
+        name: keypadNote.trim() || 'รายการกำหนดเอง',
+        unitPrice: keypadAmount,
+        quantity: 1,
+        selectedOptions: [],
+        note: '',
+        itemTotal: keypadAmount,
+      });
       setKeypadDigits('');
-    } else if (key === '+') {
-      // Add to cart and keep entering
-      if (keypadAmount > 0) {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-        addItem({
-          menuId: `custom-${Crypto.randomUUID()}`,
-          name: keypadNote.trim() || 'รายการกำหนดเอง',
-          unitPrice: keypadAmount,
-          quantity: 1,
-          selectedOptions: [],
-          note: '',
-          itemTotal: keypadAmount,
-        });
-        setKeypadDigits('');
-        setKeypadNote('');
-      }
-    } else {
-      if (keypadDigits.length < 8) {
-        setKeypadDigits((prev) => prev + key);
-      }
+      setKeypadNote('');
     }
   }, [keypadDigits, keypadAmount, keypadNote, addItem]);
 
@@ -192,7 +183,7 @@ export default function PosScreen() {
               {/* Amount display */}
               <View className="items-center mb-4">
                 <Text className="text-purple-600 text-5xl font-bold">
-                  ฿{keypadAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  ฿{keypadAmount > 0 ? keypadDigits : '0'}
                 </Text>
               </View>
 
@@ -210,32 +201,25 @@ export default function PosScreen() {
               </View>
 
               {/* Numpad */}
-              <View className="flex-1 pb-3">
-                {[
-                  ['1', '2', '3'],
-                  ['4', '5', '6'],
-                  ['7', '8', '9'],
-                  ['C', '0', '+'],
-                ].map((row, ri) => (
-                  <View key={ri} className="flex-row flex-1">
-                    {row.map((key) => (
-                      <Pressable
-                        key={key}
-                        className="flex-1 items-center justify-center m-1 rounded-2xl bg-purple-50 active:bg-purple-100"
-                        onPress={() => handleKeypadPress(key)}
-                      >
-                        <Text
-                          className={`text-3xl font-semibold ${
-                            key === '+' ? 'text-purple-600' : key === 'C' ? 'text-red-400' : 'text-mekha-text'
-                          }`}
-                        >
-                          {key}
-                        </Text>
-                      </Pressable>
-                    ))}
-                  </View>
-                ))}
+              <View className="flex-1 justify-center pb-3">
+                <NumPad value={keypadDigits} onChange={setKeypadDigits} />
               </View>
+
+              {/* Add item button (+ above checkout) */}
+              <Pressable
+                className={`w-full py-3 rounded-2xl items-center mb-2 ${
+                  keypadAmount > 0 ? 'bg-purple-50 border border-purple-200' : 'bg-gray-50 border border-gray-200'
+                }`}
+                onPress={handleKeypadAdd}
+                disabled={keypadAmount <= 0}
+              >
+                <View className="flex-row items-center gap-1.5">
+                  <Ionicons name="add-circle" size={18} color={keypadAmount > 0 ? '#7C3AED' : '#9CA3AF'} />
+                  <Text className={`font-semibold text-sm ${keypadAmount > 0 ? 'text-purple-700' : 'text-gray-400'}`}>
+                    เพิ่มรายการ
+                  </Text>
+                </View>
+              </Pressable>
 
               {/* Checkout button */}
               <Pressable

@@ -19,6 +19,7 @@ import { setTableStatus, clearTable } from '../../../src/db/repositories/tableRe
 import { generatePromptPayQR } from '../../../src/lib/promptpay';
 import { getBtcRateThb, thbToSats } from '../../../src/lib/exchangeRate';
 import { fetchLnurlPayParams, requestInvoice } from '../../../src/lib/lightning';
+import NumPad from '../../../src/components/NumPad';
 import type { PaymentMethod } from '../../../src/types';
 import QRCode from 'react-native-qrcode-svg';
 
@@ -355,32 +356,7 @@ export default function CheckoutScreen() {
         </View>
 
         {/* NumPad */}
-        <View className="items-center">
-          {[
-            ['1', '2', '3'],
-            ['4', '5', '6'],
-            ['7', '8', '9'],
-            ['.', '0', 'DEL'],
-          ].map((row, rowIdx) => (
-            <View key={rowIdx} className="flex-row mb-2">
-              {row.map((key) => (
-                <Pressable
-                  key={key}
-                  className="w-20 h-14 items-center justify-center mx-1 rounded-xl bg-purple-50 active:bg-purple-100"
-                  onPress={() => {
-                    if (key === 'DEL') {
-                      setReceivedAmount((p) => p.slice(0, -1));
-                    } else {
-                      setReceivedAmount((p) => p + key);
-                    }
-                  }}
-                >
-                  <Text className="text-lg font-semibold text-mekha-text">{key}</Text>
-                </Pressable>
-              ))}
-            </View>
-          ))}
-        </View>
+        <NumPad value={receivedAmount} onChange={setReceivedAmount} />
 
         <Pressable
           className={`mt-4 w-full py-4 rounded-2xl items-center ${
