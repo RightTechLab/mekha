@@ -18,7 +18,8 @@
       "bundleIdentifier": "com.pos.mekha",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
-      }
+      },
+      "buildNumber": "2"
     },
     "android": {
       "adaptiveIcon": {
