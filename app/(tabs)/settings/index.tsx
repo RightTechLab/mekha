@@ -14,6 +14,7 @@ import { useSessionStore } from '../../../src/features/auth/sessionStore';
 import { getSetting, setSetting, getTransactions } from '../../../src/db/repositories/transactionRepo';
 import { getAllMenus, createMenu, getMenuById } from '../../../src/db/repositories/menuRepo';
 import { getAllTables, createTable, deleteTable } from '../../../src/db/repositories/tableRepo';
+import { useLnurlCacheStore } from '../../../src/features/payment/lnurlCacheStore';
 import db from '../../../src/db/client';
 import { generateLightningReport } from '../../../src/lib/exportPdf';
 import type { TableItem } from '../../../src/db/repositories/tableRepo';
@@ -105,6 +106,10 @@ export default function SettingsScreen() {
     }
     if (lnAddress.trim()) {
       await SecureStore.setItemAsync('mekha.ln_address', lnAddress.trim());
+      // Trigger LNURL pre-fetch when LN address is saved
+      useLnurlCacheStore.getState().invalidate();
+      useLnurlCacheStore.getState().prefetch(lnAddress.trim());
+    }
     }
     setInitPayment({ promptpayId: promptpayId.trim(), lnAddress: lnAddress.trim() });
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -438,13 +443,14 @@ export default function SettingsScreen() {
         />
         <Text className="text-sm text-mekha-muted mb-1">Lightning Address</Text>
         <TextInput
-          className="bg-mekha-surface border border-mekha-border rounded-xl px-4 py-3 mb-3 text-mekha-text"
+          className="bg-mekha-surface border border-mekha-border rounded-xl px-4 py-3 mb-2 text-mekha-text"
           placeholder="user@domain.com"
           value={lnAddress}
           onChangeText={setLnAddress}
           autoCapitalize="none"
           keyboardType="email-address"
         />
+        <LnCacheStatus />
         <Pressable
           className={`py-3 rounded-xl items-center mb-6 ${isPaymentDirty ? 'bg-purple-600' : 'bg-gray-300'}`}
           onPress={handleSavePayment}
@@ -633,6 +639,36 @@ function SectionHeader({ title }: { title: string }) {
   return (
     <Text className="text-base font-semibold text-mekha-text mb-3">{title}</Text>
   );
+}
+
+function LnCacheStatus() {
+  const { loading, error, getCacheStatus } = useLnurlCacheStore();
+  const { ready, minutesAgo } = getCacheStatus();
+
+  if (loading) {
+    return (
+      <View className="bg-amber-50 rounded-lg px-3 py-2 mb-3">
+        <Text className="text-amber-700 text-xs">⚡ กำลังเชื่อมต่อ...</Text>
+      </View>
+    );
+  }
+  if (ready) {
+    return (
+      <View className="bg-green-50 rounded-lg px-3 py-2 mb-3">
+        <Text className="text-green-700 text-xs">
+          ⚡ Lightning พร้อมใช้งาน · อัปเดต {minutesAgo === 0 ? 'เมื่อสักครู่' : `${minutesAgo} นาทีที่แล้ว`}
+        </Text>
+      </View>
+    );
+  }
+  if (error) {
+    return (
+      <View className="bg-red-50 rounded-lg px-3 py-2 mb-3">
+        <Text className="text-red-700 text-xs">⚡ {error}</Text>
+      </View>
+    );
+  }
+  return null;
 }
 
 async function hashPin(pin: string): Promise<string> {

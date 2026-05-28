@@ -19,6 +19,7 @@ import { setTableStatus, clearTable } from '../../../src/db/repositories/tableRe
 import { generatePromptPayQR } from '../../../src/lib/promptpay';
 import { getBtcRateThb, thbToSats } from '../../../src/lib/exchangeRate';
 import { fetchLnurlPayParams, requestInvoice, createTimingLog, reportTimingLog, parseInvoiceExpiry } from '../../../src/lib/lightning';
+import { useLnurlCacheStore } from '../../../src/features/payment/lnurlCacheStore';
 import NumPad from '../../../src/components/NumPad';
 import type { PaymentMethod } from '../../../src/types';
 import QRCode from 'react-native-qrcode-svg';
@@ -185,14 +186,25 @@ export default function CheckoutScreen() {
           setLnRate(rate);
           setLnAmountSat(amountSat);
 
-          const params = await fetchLnurlPayParams(lnAddress, timing);
-          if (amountMsat < params.minSendable || amountMsat > params.maxSendable) {
-            setLnError(`จำนวนเงินไม่อยู่ในช่วงที่รองรับ (${params.minSendable / 1000}-${params.maxSendable / 1000} sats)`);
-            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-            setLnLoading(false);
-            return;
+          timing.t1_startFetchLnurl = Date.now();
+
+          // Use LNURL cache for faster invoice creation
+          const { requestInvoiceWithCache, cache } = useLnurlCacheStore.getState();
+
+          // Validate amount against cached min/max if available
+          if (cache && (Date.now() - cache.fetchedAt < 3600000)) {
+            if (amountMsat < cache.minSendable || amountMsat > cache.maxSendable) {
+              setLnError(`จำนวนเงินไม่อยู่ในช่วงที่รองรับ (${cache.minSendable / 1000}-${cache.maxSendable / 1000} sats)`);
+              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+              setLnLoading(false);
+              return;
+            }
           }
-          const invoice = await requestInvoice(params.callback, amountMsat, timing);
+
+          timing.t3_startFetchInvoice = Date.now();
+          const invoice = await requestInvoiceWithCache(amountMsat, lnAddress);
+          timing.t4_gotInvoice = Date.now();
+
           setLnInvoice(invoice);
 
           // Parse expiry from invoice
