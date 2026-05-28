@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { View, Text, Pressable, ScrollView, ActivityIndicator, TextInput, Alert, useWindowDimensions } from 'react-native';
 import { router } from 'expo-router';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -18,7 +18,7 @@ import { getSetting } from '../../../src/db/repositories/transactionRepo';
 import { setTableStatus, clearTable } from '../../../src/db/repositories/tableRepo';
 import { generatePromptPayQR } from '../../../src/lib/promptpay';
 import { getBtcRateThb, thbToSats } from '../../../src/lib/exchangeRate';
-import { fetchLnurlPayParams, requestInvoice } from '../../../src/lib/lightning';
+import { fetchLnurlPayParams, requestInvoice, createTimingLog, reportTimingLog, parseInvoiceExpiry } from '../../../src/lib/lightning';
 import NumPad from '../../../src/components/NumPad';
 import type { PaymentMethod } from '../../../src/types';
 import QRCode from 'react-native-qrcode-svg';
@@ -38,6 +38,10 @@ export default function CheckoutScreen() {
   const [lnError, setLnError] = useState('');
   const [lnAmountSat, setLnAmountSat] = useState(0);
   const [lnRate, setLnRate] = useState(0);
+  const [lnExpiry, setLnExpiry] = useState<number | null>(null); // epoch ms
+  const [lnExpiryText, setLnExpiryText] = useState('');
+  const [lnExpired, setLnExpired] = useState(false);
+  const expiryTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [showCustomDiscount, setShowCustomDiscount] = useState(false);
   const [customDiscountValue, setCustomDiscountValue] = useState('');
   const [customDiscountType, setCustomDiscountType] = useState<'percent' | 'fixed'>('percent');
@@ -47,6 +51,35 @@ export default function CheckoutScreen() {
   const [selectedUnitIndices, setSelectedUnitIndices] = useState<Set<number>>(new Set());
   const [paidUnitIndices, setPaidUnitIndices] = useState<Set<number>>(new Set());
   const [paidSplits, setPaidSplits] = useState<{ label: string; amount: number; method: PaymentMethod; amountSat: number | null; btcRate: number | null; invoice: string | null; qrRef: string | null }[]>([]);
+
+  // Expiry countdown timer
+  useEffect(() => {
+    if (lnExpiry && !lnExpired) {
+      const updateExpiry = () => {
+        const remaining = lnExpiry - Date.now();
+        if (remaining <= 0) {
+          setLnExpiryText('');
+          setLnExpired(true);
+          if (expiryTimerRef.current) {
+            clearInterval(expiryTimerRef.current);
+            expiryTimerRef.current = null;
+          }
+        } else {
+          const mins = Math.floor(remaining / 60000);
+          const secs = Math.floor((remaining % 60000) / 1000);
+          setLnExpiryText(`หมดอายุใน ${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`);
+        }
+      };
+      updateExpiry();
+      expiryTimerRef.current = setInterval(updateExpiry, 1000);
+      return () => {
+        if (expiryTimerRef.current) {
+          clearInterval(expiryTimerRef.current);
+          expiryTimerRef.current = null;
+        }
+      };
+    }
+  }, [lnExpiry, lnExpired]);
 
   const total = getTotal();
   const subtotal = getSubtotal();
@@ -128,7 +161,11 @@ export default function CheckoutScreen() {
       } else if (method === 'lightning') {
         setLnLoading(true);
         setLnError('');
+        setLnExpired(false);
+        setLnExpiry(null);
+        setLnExpiryText('');
         setStep('lightning');
+        const timing = createTimingLog();
         try {
           const lnAddress = await SecureStore.getItemAsync('mekha.ln_address');
           if (!lnAddress) {
@@ -143,15 +180,24 @@ export default function CheckoutScreen() {
           setLnRate(rate);
           setLnAmountSat(amountSat);
 
-          const params = await fetchLnurlPayParams(lnAddress);
+          const params = await fetchLnurlPayParams(lnAddress, timing);
           if (amountMsat < params.minSendable || amountMsat > params.maxSendable) {
             setLnError(`จำนวนเงินไม่อยู่ในช่วงที่รองรับ (${params.minSendable / 1000}-${params.maxSendable / 1000} sats)`);
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
             setLnLoading(false);
             return;
           }
-          const invoice = await requestInvoice(params.callback, amountMsat);
+          const invoice = await requestInvoice(params.callback, amountMsat, timing);
           setLnInvoice(invoice);
+
+          // Parse expiry from invoice
+          const expiryMs = parseInvoiceExpiry(invoice);
+          if (expiryMs) {
+            setLnExpiry(expiryMs);
+          }
+
+          timing.t5_qrRendered = Date.now();
+          reportTimingLog(timing);
         } catch (e: any) {
           setLnError(e?.message ?? 'ไม่สามารถสร้าง Invoice ได้');
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
@@ -445,11 +491,30 @@ export default function CheckoutScreen() {
           </View>
         ) : null}
 
-        {lnInvoice && !lnLoading ? (
+        {lnExpired && !lnLoading ? (
+          <View className="items-center w-full">
+            <View className="bg-red-50 rounded-2xl px-5 py-6 mb-6 w-full items-center">
+              <Ionicons name="time-outline" size={40} color="#DC2626" />
+              <Text className="text-red-700 font-semibold text-lg mt-3">Invoice หมดอายุแล้ว</Text>
+              <Text className="text-red-600 text-sm mt-1">กรุณาสร้าง Invoice ใหม่</Text>
+            </View>
+            <Pressable
+              className="w-full py-4 rounded-2xl items-center bg-purple-600 mb-3"
+              onPress={() => handlePayment('lightning')}
+            >
+              <Text className="text-white font-semibold">สร้าง Invoice ใหม่</Text>
+            </Pressable>
+          </View>
+        ) : lnInvoice && !lnLoading ? (
           <>
             <View className="bg-white p-4 rounded-2xl border border-mekha-border mb-4">
               <QRCode value={lnInvoice} size={220} />
             </View>
+            {lnExpiryText ? (
+              <View className="bg-amber-50 rounded-xl px-4 py-2 mb-4">
+                <Text className="text-amber-700 text-sm font-medium text-center">{lnExpiryText}</Text>
+              </View>
+            ) : null}
             <Text className="text-mekha-muted text-center text-sm mb-6">
               ลูกค้าสแกน QR เพื่อชำระ{'\n'}กดยืนยันเมื่อเช็คสถานะเรียบร้อย
             </Text>
