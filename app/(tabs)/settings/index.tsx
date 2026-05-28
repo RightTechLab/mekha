@@ -14,6 +14,7 @@ import { useSessionStore } from '../../../src/features/auth/sessionStore';
 import { getSetting, setSetting, getTransactions } from '../../../src/db/repositories/transactionRepo';
 import { getAllMenus, createMenu, getMenuById } from '../../../src/db/repositories/menuRepo';
 import { getAllTables, createTable, deleteTable } from '../../../src/db/repositories/tableRepo';
+import db from '../../../src/db/client';
 import { generateLightningReport } from '../../../src/lib/exportPdf';
 import type { TableItem } from '../../../src/db/repositories/tableRepo';
 
@@ -23,13 +24,17 @@ export default function SettingsScreen() {
 
   const [shopName, setShopName] = useState(getSetting('shop_name') ?? 'Mekha');
   const [vatRate, setVatRate] = useState(getSetting('vat_rate') ?? '7');
+  const [vatMode, setVatMode] = useState<'included' | 'excluded'>(
+    (getSetting('vat_mode') as 'included' | 'excluded') ?? 'included'
+  );
+  const [serviceChargeRate, setServiceChargeRate] = useState(getSetting('service_charge_rate') ?? '0');
   const [promptpayId, setPromptpayId] = useState('');
   const [lnAddress, setLnAddress] = useState('');
 
   // Track dirty state for save buttons
-  const initGeneral = useRef({ shopName: getSetting('shop_name') ?? 'Mekha', vatRate: getSetting('vat_rate') ?? '7' });
+  const initGeneral = useRef({ shopName: getSetting('shop_name') ?? 'Mekha', vatRate: getSetting('vat_rate') ?? '7', vatMode: (getSetting('vat_mode') ?? 'included') as string, serviceChargeRate: getSetting('service_charge_rate') ?? '0' });
   const [initPayment, setInitPayment] = useState({ promptpayId: '', lnAddress: '' });
-  const isGeneralDirty = shopName !== initGeneral.current.shopName || vatRate !== initGeneral.current.vatRate;
+  const isGeneralDirty = shopName !== initGeneral.current.shopName || vatRate !== initGeneral.current.vatRate || vatMode !== initGeneral.current.vatMode || serviceChargeRate !== initGeneral.current.serviceChargeRate;
   const isPaymentDirty = promptpayId !== initPayment.promptpayId || lnAddress !== initPayment.lnAddress;
   const [cashierPin, setCashierPin] = useState('');
   const [ownerPin, setOwnerPin] = useState('');
@@ -53,7 +58,10 @@ export default function SettingsScreen() {
   const handleSaveGeneral = () => {
     setSetting('shop_name', shopName.trim());
     setSetting('vat_rate', vatRate);
-    initGeneral.current = { shopName: shopName.trim(), vatRate };
+    setSetting('vat_mode', vatMode);
+    setSetting('vat_included', vatMode === 'included' ? '1' : '0');
+    setSetting('service_charge_rate', serviceChargeRate);
+    initGeneral.current = { shopName: shopName.trim(), vatRate, vatMode, serviceChargeRate };
     setShopName(shopName.trim());
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
   };
@@ -210,6 +218,35 @@ export default function SettingsScreen() {
     router.replace('/(auth)/pin');
   };
 
+  const handleClearData = () => {
+    Alert.alert(
+      'ล้างข้อมูลทั้งหมด',
+      'ลบเมนู, ออเดอร์, รายการขาย, โต๊ะ ทั้งหมด\n(ค่าตั้งค่าจะไม่ถูกลบ)',
+      [
+        { text: 'ยกเลิก', style: 'cancel' },
+        {
+          text: 'ล้างข้อมูล',
+          style: 'destructive',
+          onPress: () => {
+            db.execSync(`
+              DELETE FROM order_items;
+              DELETE FROM transactions;
+              DELETE FROM orders;
+              DELETE FROM option_items;
+              DELETE FROM option_groups;
+              DELETE FROM menus;
+              DELETE FROM audit_logs;
+              DELETE FROM tables;
+            `);
+            setTables([]);
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            Alert.alert('สำเร็จ', 'ล้างข้อมูลเรียบร้อยแล้ว');
+          },
+        },
+      ]
+    );
+  };
+
   const handleLightningReport = async (days: number) => {
     const endDate = format(new Date(), 'yyyy-MM-dd');
     const startDate = format(subDays(new Date(), days), 'yyyy-MM-dd');
@@ -249,6 +286,43 @@ export default function SettingsScreen() {
           placeholder="อัตรา VAT (%)"
           value={vatRate}
           onChangeText={setVatRate}
+          keyboardType="decimal-pad"
+        />
+        <Text className="text-sm text-mekha-muted mb-1">โหมด VAT</Text>
+        <View className="flex-row gap-2 mb-3">
+          <Pressable
+            className={`flex-1 py-3 rounded-xl items-center border ${
+              vatMode === 'included' ? 'bg-purple-600 border-purple-600' : 'bg-mekha-surface border-mekha-border'
+            }`}
+            onPress={() => setVatMode('included')}
+          >
+            <Text className={`text-sm font-medium ${vatMode === 'included' ? 'text-white' : 'text-mekha-text'}`}>
+              รวมใน VAT
+            </Text>
+            <Text className={`text-xs mt-0.5 ${vatMode === 'included' ? 'text-purple-200' : 'text-mekha-muted'}`}>
+              ราคารวม VAT แล้ว
+            </Text>
+          </Pressable>
+          <Pressable
+            className={`flex-1 py-3 rounded-xl items-center border ${
+              vatMode === 'excluded' ? 'bg-purple-600 border-purple-600' : 'bg-mekha-surface border-mekha-border'
+            }`}
+            onPress={() => setVatMode('excluded')}
+          >
+            <Text className={`text-sm font-medium ${vatMode === 'excluded' ? 'text-white' : 'text-mekha-text'}`}>
+              แยก VAT
+            </Text>
+            <Text className={`text-xs mt-0.5 ${vatMode === 'excluded' ? 'text-purple-200' : 'text-mekha-muted'}`}>
+              บวก VAT เพิ่ม
+            </Text>
+          </Pressable>
+        </View>
+        <Text className="text-sm text-mekha-muted mb-1">Service Charge (%)</Text>
+        <TextInput
+          className="bg-mekha-surface border border-mekha-border rounded-xl px-4 py-3 mb-3 text-mekha-text"
+          placeholder="เช่น 10 (0 = ไม่คิด)"
+          value={serviceChargeRate}
+          onChangeText={setServiceChargeRate}
           keyboardType="decimal-pad"
         />
         <Pressable
@@ -439,6 +513,12 @@ export default function SettingsScreen() {
           onPress={handleBackup}
         >
           <Text className="text-mekha-text font-medium">สำรองข้อมูล</Text>
+        </Pressable>
+        <Pressable
+          className="bg-red-50 border border-red-200 py-3 rounded-xl items-center mb-6"
+          onPress={handleClearData}
+        >
+          <Text className="text-red-700 font-medium">ล้างข้อมูลทั้งหมด</Text>
         </Pressable>
 
         {/* Logout */}

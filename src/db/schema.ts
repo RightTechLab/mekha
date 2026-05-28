@@ -53,6 +53,7 @@ CREATE TABLE IF NOT EXISTS transactions (
   amount_sat        INTEGER,
   btc_rate_thb      REAL,
   discount_amount   REAL DEFAULT 0,
+  service_charge_amount REAL DEFAULT 0,
   vat_amount        REAL DEFAULT 0,
   vat_included      INTEGER DEFAULT 1,
   status            TEXT DEFAULT 'completed',

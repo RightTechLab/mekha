@@ -51,18 +51,21 @@ export default function CheckoutScreen() {
   const total = getTotal();
   const subtotal = getSubtotal();
   const vatRate = parseFloat(getSetting('vat_rate') ?? '7');
-  const vatIncluded = getSetting('vat_included') === '1';
+  const vatIncluded = getSetting('vat_mode') !== 'excluded';
+  const serviceChargeRate = parseFloat(getSetting('service_charge_rate') ?? '0');
   const discountAmount = discount
     ? discount.type === 'percent'
       ? subtotal * (discount.value / 100)
       : discount.value
     : 0;
   const afterDiscount = subtotal - discountAmount;
+  const serviceChargeAmount = serviceChargeRate > 0 ? afterDiscount * (serviceChargeRate / 100) : 0;
+  const afterServiceCharge = afterDiscount + serviceChargeAmount;
   const vatAmount = vatIncluded
-    ? afterDiscount - afterDiscount / (1 + vatRate / 100)
-    : afterDiscount * (vatRate / 100);
+    ? afterServiceCharge - afterServiceCharge / (1 + vatRate / 100)
+    : afterServiceCharge * (vatRate / 100);
   // finalTotal = amount the customer actually pays
-  const finalTotal = vatIncluded ? afterDiscount : afterDiscount + vatAmount;
+  const finalTotal = vatIncluded ? afterServiceCharge : afterServiceCharge + vatAmount;
 
   // Split bill calculations
   const splitPerPerson = customerCount > 1 ? finalTotal / customerCount : finalTotal;
@@ -245,6 +248,7 @@ export default function CheckoutScreen() {
             amount_sat: split.amountSat,
             btc_rate_thb: split.btcRate,
             discount_amount: 0,
+            service_charge_amount: 0,
             vat_amount: 0,
             vat_included: vatIncluded ? 1 : 0,
             status: 'completed',
@@ -267,6 +271,7 @@ export default function CheckoutScreen() {
             amount_sat: extra?.amountSat ?? null,
             btc_rate_thb: extra?.btcRate ?? null,
             discount_amount: discountAmount,
+            service_charge_amount: serviceChargeAmount,
             vat_amount: vatAmount,
             vat_included: vatIncluded ? 1 : 0,
             status: 'completed',
@@ -287,6 +292,7 @@ export default function CheckoutScreen() {
           amount_sat: extra?.amountSat ?? null,
           btc_rate_thb: extra?.btcRate ?? null,
           discount_amount: discountAmount,
+          service_charge_amount: serviceChargeAmount,
           vat_amount: vatAmount,
           vat_included: vatIncluded ? 1 : 0,
           status: 'completed',
@@ -302,7 +308,7 @@ export default function CheckoutScreen() {
       clear();
       setStep('done');
     },
-    [items, finalTotal, discountAmount, vatAmount, vatIncluded, role, clear, paidSplits, remaining, tableId, lnInvoice, qrData]
+    [items, finalTotal, discountAmount, serviceChargeAmount, vatAmount, vatIncluded, role, clear, paidSplits, remaining, tableId, lnInvoice, qrData]
   );
 
   if (step === 'done') {
@@ -860,6 +866,12 @@ export default function CheckoutScreen() {
               ส่วนลด{discount?.type === 'percent' ? ` ${discount.value}%` : ''}
             </Text>
             <Text className="text-red-700">-฿{discountAmount.toFixed(2)}</Text>
+          </View>
+        )}
+        {serviceChargeAmount > 0 && (
+          <View className="flex-row justify-between mb-1">
+            <Text className="text-mekha-muted">Service Charge {serviceChargeRate}%</Text>
+            <Text className="text-mekha-text">฿{serviceChargeAmount.toFixed(2)}</Text>
           </View>
         )}
         <View className="flex-row justify-between mb-1">

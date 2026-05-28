@@ -3,8 +3,8 @@ import type { Transaction, AuditLog } from '../../types';
 
 export function createTransaction(txn: Omit<Transaction, 'created_at'>): void {
   db.runSync(
-    `INSERT INTO transactions (id, order_id, payment_method, amount_thb, amount_sat, btc_rate_thb, discount_amount, vat_amount, vat_included, status, lightning_invoice, lightning_preimage, promptpay_ref, cashier_id, void_reason)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO transactions (id, order_id, payment_method, amount_thb, amount_sat, btc_rate_thb, discount_amount, service_charge_amount, vat_amount, vat_included, status, lightning_invoice, lightning_preimage, promptpay_ref, cashier_id, void_reason)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       txn.id,
       txn.order_id,
@@ -13,6 +13,7 @@ export function createTransaction(txn: Omit<Transaction, 'created_at'>): void {
       txn.amount_sat,
       txn.btc_rate_thb,
       txn.discount_amount,
+      txn.service_charge_amount,
       txn.vat_amount,
       txn.vat_included,
       txn.status,

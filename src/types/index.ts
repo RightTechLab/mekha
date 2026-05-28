@@ -64,6 +64,7 @@ export interface Transaction {
   amount_sat: number | null;
   btc_rate_thb: number | null;
   discount_amount: number;
+  service_charge_amount: number;
   vat_amount: number;
   vat_included: number;
   status: TransactionStatus;
