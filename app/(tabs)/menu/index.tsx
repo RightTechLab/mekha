@@ -1,32 +1,28 @@
 import { useState, useCallback } from 'react';
-import { View, Text, Pressable, TextInput, ScrollView, Alert, FlatList } from 'react-native';
-import { router } from 'expo-router';
+import { View, Text, Pressable, TextInput, Alert } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { FlashList } from '@shopify/flash-list';
-import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import * as Crypto from 'expo-crypto';
 import {
   getAllMenus,
-  createMenu,
   deleteMenu,
   getMenuCategories,
   getAllCategories,
   createCategory,
   deleteCategory,
 } from '../../../src/db/repositories/menuRepo';
+import MenuFormModal from '../../../src/components/MenuFormModal';
 import type { CategoryItem } from '../../../src/db/repositories/menuRepo';
 import type { Menu } from '../../../src/types';
 
 export default function MenuScreen() {
   const insets = useSafeAreaInsets();
-  const [showAdd, setShowAdd] = useState(false);
+  const [showMenuModal, setShowMenuModal] = useState(false);
+  const [editMenuId, setEditMenuId] = useState<string | null>(null);
   const [showCatManage, setShowCatManage] = useState(false);
   const [newCatName, setNewCatName] = useState('');
-  const [name, setName] = useState('');
-  const [price, setPrice] = useState('');
-  const [category, setCategory] = useState('');
   const [refreshKey, setRefreshKey] = useState(0);
   const [menus, setMenus] = useState<Menu[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
@@ -40,29 +36,21 @@ export default function MenuScreen() {
     }, [refreshKey])
   );
 
-  const handleAdd = useCallback(() => {
-    if (!name.trim() || !price.trim()) return;
+  const handleOpenAddMenu = useCallback(() => {
+    setEditMenuId(null);
+    setShowMenuModal(true);
+    setShowCatManage(false);
+  }, []);
 
-    const priceNum = parseFloat(price);
-    if (isNaN(priceNum) || priceNum <= 0) return;
+  const handleOpenEditMenu = useCallback((id: string) => {
+    setEditMenuId(id);
+    setShowMenuModal(true);
+    setShowCatManage(false);
+  }, []);
 
-    createMenu({
-      id: Crypto.randomUUID(),
-      name: name.trim(),
-      price: priceNum,
-      category: category.trim() || null,
-      image_path: null,
-      is_active: 1,
-      sort_order: 0,
-    });
-
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    setName('');
-    setPrice('');
-    setCategory('');
-    setShowAdd(false);
+  const handleMenuSaved = useCallback(() => {
     setRefreshKey((k) => k + 1);
-  }, [name, price, category]);
+  }, []);
 
   const handleDelete = useCallback((id: string, menuName: string) => {
     Alert.alert('ลบเมนู', `ต้องการลบ "${menuName}" หรือไม่?`, [
@@ -114,17 +102,15 @@ export default function MenuScreen() {
         <View className="flex-row gap-2">
           <Pressable
             className={`px-3 py-2 rounded-full ${showCatManage ? 'bg-purple-100' : 'bg-purple-50'}`}
-            onPress={() => { setShowCatManage(!showCatManage); setShowAdd(false); }}
+            onPress={() => { setShowCatManage(!showCatManage); }}
           >
             <Text className="text-purple-700 font-medium text-sm">หมวดหมู่</Text>
           </Pressable>
           <Pressable
             className="bg-purple-600 px-4 py-2 rounded-full"
-            onPress={() => { setShowAdd(!showAdd); setShowCatManage(false); }}
+            onPress={handleOpenAddMenu}
           >
-            <Text className="text-white font-medium text-sm">
-              {showAdd ? 'ยกเลิก' : '+ เพิ่ม'}
-            </Text>
+            <Text className="text-white font-medium text-sm">+ เพิ่ม</Text>
           </Pressable>
         </View>
       </View>
@@ -170,73 +156,6 @@ export default function MenuScreen() {
         </View>
       )}
 
-      {showAdd && (
-        <View className="mx-4 mb-4 p-4 bg-mekha-surface border border-mekha-border rounded-2xl">
-          <TextInput
-            className="bg-white border border-mekha-border rounded-xl px-4 py-3 mb-3 text-mekha-text"
-            placeholder="ชื่อเมนู"
-            value={name}
-            onChangeText={setName}
-          />
-          <TextInput
-            className="bg-white border border-mekha-border rounded-xl px-4 py-3 mb-3 text-mekha-text"
-            placeholder="ราคา (฿)"
-            value={price}
-            onChangeText={setPrice}
-            keyboardType="decimal-pad"
-          />
-          {/* Category dropdown */}
-          <View className="mb-3">
-            <Text className="text-sm text-mekha-muted mb-1.5">หมวดหมู่</Text>
-            {userCategories.length > 0 ? (
-              <View className="bg-white border border-mekha-border rounded-xl overflow-hidden">
-                <ScrollView horizontal={false} style={{ maxHeight: 180 }}>
-                  {userCategories.map((cat) => {
-                    const isSelected = category === cat.name;
-                    return (
-                      <Pressable
-                        key={cat.id}
-                        className={`px-4 py-3 border-b border-mekha-border ${
-                          isSelected ? 'bg-purple-50' : ''
-                        }`}
-                        onPress={() => setCategory(isSelected ? '' : cat.name)}
-                      >
-                        <View className="flex-row items-center justify-between">
-                          <Text className={`text-sm ${isSelected ? 'text-purple-700 font-semibold' : 'text-mekha-text'}`}>
-                            {cat.name}
-                          </Text>
-                          {isSelected && (
-                            <Ionicons name="checkmark-circle" size={18} color="#7C3AED" />
-                          )}
-                        </View>
-                      </Pressable>
-                    );
-                  })}
-                </ScrollView>
-              </View>
-            ) : (
-              <Pressable
-                className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3"
-                onPress={() => { setShowCatManage(true); setShowAdd(false); }}
-              >
-                <Text className="text-amber-700 text-sm text-center">
-                  ยังไม่มีหมวดหมู่ — กดเพื่อสร้างก่อน
-                </Text>
-              </Pressable>
-            )}
-            {category ? (
-              <Text className="text-xs text-purple-600 mt-1">เลือก: {category}</Text>
-            ) : null}
-          </View>
-          <Pressable
-            className="bg-purple-600 py-3 rounded-xl items-center"
-            onPress={handleAdd}
-          >
-            <Text className="text-white font-semibold">บันทึก</Text>
-          </Pressable>
-        </View>
-      )}
-
       {menus.length === 0 ? (
         <View className="flex-1 items-center justify-center">
           <Text className="text-mekha-muted">ยังไม่มีเมนู</Text>
@@ -249,7 +168,7 @@ export default function MenuScreen() {
           renderItem={({ item }) => (
             <Pressable
               className="flex-row items-center justify-between py-4 px-4 mb-2 bg-mekha-surface border border-mekha-border rounded-2xl"
-              onPress={() => router.push(`/(tabs)/menu/${item.id}`)}
+              onPress={() => handleOpenEditMenu(item.id)}
               onLongPress={() => handleDelete(item.id, item.name)}
             >
               <View className="flex-1">
@@ -265,6 +184,14 @@ export default function MenuScreen() {
           )}
         />
       )}
+
+      {/* Unified Menu Form Modal — for both add and edit */}
+      <MenuFormModal
+        visible={showMenuModal}
+        menuId={editMenuId}
+        onClose={() => setShowMenuModal(false)}
+        onSaved={handleMenuSaved}
+      />
     </SafeAreaView>
   );
 }
