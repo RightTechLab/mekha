@@ -154,12 +154,52 @@ export default function SettingsScreen() {
   };
 
   const handleExportMenu = async () => {
-    const menus = getAllMenus();
-    const data = JSON.stringify({ menus, exported_at: new Date().toISOString() }, null, 2);
-    const file = new File(Paths.document, 'mekha-menu-export.json');
-    if (!file.exists) file.create();
-    file.write(data);
-    await Sharing.shareAsync(file.uri, { mimeType: 'application/json' });
+    Alert.alert('ส่งออกข้อมูล', 'เลือกรูปแบบการส่งออก', [
+      {
+        text: 'เมนูอย่างเดียว',
+        onPress: async () => {
+          const menus = getAllMenus();
+          const optionGroups: any[] = [];
+          const optionItems: any[] = [];
+          for (const menu of menus) {
+            const groups = db.getAllSync<any>('SELECT * FROM option_groups WHERE menu_id = ?', [menu.id]);
+            optionGroups.push(...groups);
+            for (const group of groups) {
+              const items = db.getAllSync<any>('SELECT * FROM option_items WHERE option_group_id = ?', [group.id]);
+              optionItems.push(...items);
+            }
+          }
+          const data = JSON.stringify({ menus, option_groups: optionGroups, option_items: optionItems, exported_at: new Date().toISOString() }, null, 2);
+          const file = new File(Paths.document, 'mekha-menu-export.json');
+          if (!file.exists) file.create();
+          file.write(data);
+          await Sharing.shareAsync(file.uri, { mimeType: 'application/json' });
+        },
+      },
+      {
+        text: 'เมนูและโต๊ะ',
+        onPress: async () => {
+          const menus = getAllMenus();
+          const optionGroups: any[] = [];
+          const optionItems: any[] = [];
+          for (const menu of menus) {
+            const groups = db.getAllSync<any>('SELECT * FROM option_groups WHERE menu_id = ?', [menu.id]);
+            optionGroups.push(...groups);
+            for (const group of groups) {
+              const items = db.getAllSync<any>('SELECT * FROM option_items WHERE option_group_id = ?', [group.id]);
+              optionItems.push(...items);
+            }
+          }
+          const tablesData = getAllTables();
+          const data = JSON.stringify({ menus, option_groups: optionGroups, option_items: optionItems, tables: tablesData, exported_at: new Date().toISOString() }, null, 2);
+          const file = new File(Paths.document, 'mekha-menu-tables-export.json');
+          if (!file.exists) file.create();
+          file.write(data);
+          await Sharing.shareAsync(file.uri, { mimeType: 'application/json' });
+        },
+      },
+      { text: 'ยกเลิก', style: 'cancel' },
+    ]);
   };
 
   const handleBackup = async () => {
@@ -187,11 +227,15 @@ export default function SettingsScreen() {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
         return;
       }
-      let imported = 0;
-      let skipped = 0;
+      let importedMenus = 0;
+      let skippedMenus = 0;
+      let importedGroups = 0;
+      let importedItems = 0;
+      let importedTables = 0;
+
       for (const menu of data.menus) {
         if (getMenuById(menu.id)) {
-          skipped++;
+          skippedMenus++;
           continue;
         }
         createMenu({
@@ -203,10 +247,59 @@ export default function SettingsScreen() {
           is_active: menu.is_active ?? 1,
           sort_order: menu.sort_order ?? 0,
         });
-        imported++;
+        importedMenus++;
       }
+
+      // Import option groups
+      if (Array.isArray(data.option_groups)) {
+        for (const group of data.option_groups) {
+          const existing = db.getFirstSync<any>('SELECT id FROM option_groups WHERE id = ?', [group.id]);
+          if (existing) continue;
+          db.runSync(
+            'INSERT INTO option_groups (id, menu_id, name, required, multiple) VALUES (?, ?, ?, ?, ?)',
+            [group.id, group.menu_id, group.name, group.required ?? 0, group.multiple ?? 0]
+          );
+          importedGroups++;
+        }
+      }
+
+      // Import option items
+      if (Array.isArray(data.option_items)) {
+        for (const item of data.option_items) {
+          const existing = db.getFirstSync<any>('SELECT id FROM option_items WHERE id = ?', [item.id]);
+          if (existing) continue;
+          db.runSync(
+            'INSERT INTO option_items (id, option_group_id, name, price_delta) VALUES (?, ?, ?, ?)',
+            [item.id, item.option_group_id, item.name, item.price_delta ?? 0]
+          );
+          importedItems++;
+        }
+      }
+
+      // Import tables if present
+      if (Array.isArray(data.tables)) {
+        for (const table of data.tables) {
+          const existing = db.getFirstSync<any>('SELECT id FROM tables WHERE id = ?', [table.id]);
+          if (existing) {
+            // Upsert: update name/sort_order
+            db.runSync('UPDATE tables SET name = ?, sort_order = ?, is_active = 1 WHERE id = ?', [table.name, table.sort_order ?? 0, table.id]);
+          } else {
+            createTable({
+              id: table.id,
+              name: table.name,
+              sort_order: table.sort_order ?? 0,
+            });
+          }
+          importedTables++;
+        }
+        setTables(getAllTables());
+      }
+
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      Alert.alert('สำเร็จ', `นำเข้า ${imported} เมนู (ข้าม ${skipped} รายการที่มีอยู่แล้ว)`);
+      let msg = `นำเข้า ${importedMenus} เมนู (ข้าม ${skippedMenus} รายการที่มีอยู่แล้ว)`;
+      if (importedGroups > 0) msg += `\nตัวเลือก ${importedGroups} กลุ่ม, ${importedItems} รายการ`;
+      if (importedTables > 0) msg += `\nโต๊ะ ${importedTables} รายการ`;
+      Alert.alert('สำเร็จ', msg);
     } catch (e: any) {
       Alert.alert('ผิดพลาด', e?.message ?? 'ไม่สามารถนำเข้าไฟล์ได้');
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
