@@ -56,6 +56,7 @@ CREATE TABLE IF NOT EXISTS transactions (
   service_charge_amount REAL DEFAULT 0,
   vat_amount        REAL DEFAULT 0,
   vat_included      INTEGER DEFAULT 1,
+  serial_number     INTEGER,
   status            TEXT DEFAULT 'completed',
   lightning_invoice TEXT,
   lightning_preimage TEXT,

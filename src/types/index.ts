@@ -67,6 +67,7 @@ export interface Transaction {
   service_charge_amount: number;
   vat_amount: number;
   vat_included: number;
+  serial_number: number | null;
   status: TransactionStatus;
   lightning_invoice: string | null;
   lightning_preimage: string | null;

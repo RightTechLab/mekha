@@ -3,8 +3,8 @@ import type { Transaction, AuditLog } from '../../types';
 
 export function createTransaction(txn: Omit<Transaction, 'created_at'>): void {
   db.runSync(
-    `INSERT INTO transactions (id, order_id, payment_method, amount_thb, amount_sat, btc_rate_thb, discount_amount, service_charge_amount, vat_amount, vat_included, status, lightning_invoice, lightning_preimage, promptpay_ref, cashier_id, void_reason)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO transactions (id, order_id, payment_method, amount_thb, amount_sat, btc_rate_thb, discount_amount, service_charge_amount, vat_amount, vat_included, serial_number, status, lightning_invoice, lightning_preimage, promptpay_ref, cashier_id, void_reason)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       txn.id,
       txn.order_id,
@@ -16,6 +16,7 @@ export function createTransaction(txn: Omit<Transaction, 'created_at'>): void {
       txn.service_charge_amount,
       txn.vat_amount,
       txn.vat_included,
+      txn.serial_number,
       txn.status,
       txn.lightning_invoice,
       txn.lightning_preimage,
@@ -24,6 +25,18 @@ export function createTransaction(txn: Omit<Transaction, 'created_at'>): void {
       txn.void_reason,
     ]
   );
+}
+
+export function getNextSerial(): number {
+  const current = db.getFirstSync<{ value: string }>(
+    "SELECT value FROM settings WHERE key = 'qr_serial_counter'"
+  );
+  const next = (parseInt(current?.value ?? '0', 10) || 0) + 1;
+  db.runSync(
+    "INSERT OR REPLACE INTO settings (key, value) VALUES ('qr_serial_counter', ?)",
+    [String(next)]
+  );
+  return next;
 }
 
 export function getTransactions(options?: {

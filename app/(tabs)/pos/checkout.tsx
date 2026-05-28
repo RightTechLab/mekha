@@ -13,7 +13,7 @@ import {
   addOrderItem,
   updateOrderStatus,
 } from '../../../src/db/repositories/orderRepo';
-import { createTransaction } from '../../../src/db/repositories/transactionRepo';
+import { createTransaction, getNextSerial } from '../../../src/db/repositories/transactionRepo';
 import { getSetting } from '../../../src/db/repositories/transactionRepo';
 import { setTableStatus, clearTable } from '../../../src/db/repositories/tableRepo';
 import { generatePromptPayQR } from '../../../src/lib/promptpay';
@@ -41,6 +41,7 @@ export default function CheckoutScreen() {
   const [lnExpiry, setLnExpiry] = useState<number | null>(null); // epoch ms
   const [lnExpiryText, setLnExpiryText] = useState('');
   const [lnExpired, setLnExpired] = useState(false);
+  const [currentSerial, setCurrentSerial] = useState<number | null>(null);
   const expiryTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [showCustomDiscount, setShowCustomDiscount] = useState(false);
   const [customDiscountValue, setCustomDiscountValue] = useState('');
@@ -155,6 +156,8 @@ export default function CheckoutScreen() {
           Alert.alert('ยังไม่ได้ตั้งค่า', 'กรุณาตั้งค่า PromptPay ID ในหน้าตั้งค่าก่อน');
           return;
         }
+        const serial = getNextSerial();
+        setCurrentSerial(serial);
         const qr = generatePromptPayQR(promptpayId, payAmount);
         setQrData(qr);
         setStep('promptpay');
@@ -165,6 +168,8 @@ export default function CheckoutScreen() {
         setLnExpiry(null);
         setLnExpiryText('');
         setStep('lightning');
+        const serial = getNextSerial();
+        setCurrentSerial(serial);
         const timing = createTimingLog();
         try {
           const lnAddress = await SecureStore.getItemAsync('mekha.ln_address');
@@ -297,6 +302,7 @@ export default function CheckoutScreen() {
             service_charge_amount: 0,
             vat_amount: 0,
             vat_included: vatIncluded ? 1 : 0,
+            serial_number: currentSerial,
             status: 'completed',
             lightning_invoice: split.invoice ?? (split.method === 'lightning' ? lnInvoice : null),
             lightning_preimage: null,
@@ -320,6 +326,7 @@ export default function CheckoutScreen() {
             service_charge_amount: serviceChargeAmount,
             vat_amount: vatAmount,
             vat_included: vatIncluded ? 1 : 0,
+            serial_number: currentSerial,
             status: 'completed',
             lightning_invoice: method === 'lightning' ? lnInvoice : null,
             lightning_preimage: null,
@@ -341,6 +348,7 @@ export default function CheckoutScreen() {
           service_charge_amount: serviceChargeAmount,
           vat_amount: vatAmount,
           vat_included: vatIncluded ? 1 : 0,
+          serial_number: currentSerial,
           status: 'completed',
           lightning_invoice: method === 'lightning' ? lnInvoice : null,
           lightning_preimage: null,
@@ -354,7 +362,7 @@ export default function CheckoutScreen() {
       clear();
       setStep('done');
     },
-    [items, finalTotal, discountAmount, serviceChargeAmount, vatAmount, vatIncluded, role, clear, paidSplits, remaining, tableId, lnInvoice, qrData]
+    [items, finalTotal, discountAmount, serviceChargeAmount, vatAmount, vatIncluded, role, clear, paidSplits, remaining, tableId, lnInvoice, qrData, currentSerial]
   );
 
   if (step === 'done') {
@@ -436,6 +444,9 @@ export default function CheckoutScreen() {
     return (
       <SafeAreaView className="flex-1 bg-white items-center justify-center px-8">
         <Text className="text-xl font-bold text-mekha-text mb-2">PromptPay</Text>
+        {currentSerial && (
+          <Text className="text-sm text-mekha-muted mb-1">#{String(currentSerial).padStart(4, '0')}</Text>
+        )}
         <Text className="text-3xl font-bold text-purple-600 mb-6">฿{payAmount.toFixed(2)}</Text>
 
         <View className="bg-white p-4 rounded-2xl border border-mekha-border mb-6">
@@ -471,6 +482,9 @@ export default function CheckoutScreen() {
     return (
       <SafeAreaView className="flex-1 bg-white items-center justify-center px-8">
         <Text className="text-xl font-bold text-mekha-text mb-2">Lightning</Text>
+        {currentSerial && (
+          <Text className="text-sm text-mekha-muted mb-1">#{String(currentSerial).padStart(4, '0')}</Text>
+        )}
         <Text className="text-3xl font-bold text-purple-600 mb-2">฿{payAmount.toFixed(2)}</Text>
         {lnAmountSat > 0 && (
           <Text className="text-mekha-muted text-sm mb-6">

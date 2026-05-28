@@ -24,6 +24,14 @@ const STATUS_COLORS: Record<string, string> = {
   refunded: 'bg-yellow-50 text-yellow-700',
 };
 
+const STATUS_LABELS: Record<string, string> = {
+  completed: 'ชำระแล้ว',
+  voided: 'ยกเลิก',
+  refunded: 'คืนเงิน',
+  pending: 'รอชำระ',
+  expired: 'หมดอายุ',
+};
+
 const DATE_RANGES = [
   { label: 'วันนี้', days: 0 },
   { label: '7 วัน', days: 7 },
@@ -196,6 +204,11 @@ function TransactionCard({ txn }: { txn: Transaction }) {
           <Text className="text-sm font-medium text-mekha-text">
             {displayMethod}
           </Text>
+          {txn.serial_number && (
+            <View className="bg-mekha-surface px-2 py-0.5 rounded-full border border-mekha-border">
+              <Text className="text-xs text-mekha-muted font-medium">#{String(txn.serial_number).padStart(4, '0')}</Text>
+            </View>
+          )}
           {isSplitGroup && (
             <View className="bg-purple-100 px-2 py-0.5 rounded-full">
               <Text className="text-xs text-purple-700 font-medium">แบ่งจ่าย</Text>
@@ -212,7 +225,7 @@ function TransactionCard({ txn }: { txn: Transaction }) {
         </Text>
         <View className={`px-2 py-0.5 rounded-full ${STATUS_COLORS[txn.status]?.split(' ')[0] ?? 'bg-gray-100'}`}>
           <Text className={`text-xs font-medium ${STATUS_COLORS[txn.status]?.split(' ')[1] ?? 'text-gray-700'}`}>
-            {txn.status}
+            {STATUS_LABELS[txn.status] ?? txn.status}
           </Text>
         </View>
       </View>
