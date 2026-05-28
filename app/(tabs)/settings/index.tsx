@@ -110,7 +110,6 @@ export default function SettingsScreen() {
       useLnurlCacheStore.getState().invalidate();
       useLnurlCacheStore.getState().prefetch(lnAddress.trim());
     }
-    }
     setInitPayment({ promptpayId: promptpayId.trim(), lnAddress: lnAddress.trim() });
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
   };

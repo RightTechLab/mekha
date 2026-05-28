@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import * as SecureStore from 'expo-secure-store';
 import { fetchLnurlPayParams, requestInvoice } from '../../lib/lightning';
+import type { InvoiceResult } from '../../lib/lightning';
 
 const CACHE_KEY = 'mekha.lnurl_cache';
 const CACHE_MAX_AGE_MS = 60 * 60 * 1000; // 1 hour
@@ -20,7 +21,7 @@ interface LnurlCacheStore {
   prefetch: (lnAddress?: string) => Promise<void>;
   invalidate: () => void;
   getCacheStatus: () => { ready: boolean; minutesAgo: number | null };
-  requestInvoiceWithCache: (amountMsat: number, lnAddress: string) => Promise<string>;
+  requestInvoiceWithCache: (amountMsat: number, lnAddress: string) => Promise<InvoiceResult>;
 }
 
 export const useLnurlCacheStore = create<LnurlCacheStore>((set, get) => ({
@@ -80,15 +81,15 @@ export const useLnurlCacheStore = create<LnurlCacheStore>((set, get) => ({
     return { ready: true, minutesAgo: Math.floor(age / 60000) };
   },
 
-  requestInvoiceWithCache: async (amountMsat: number, lnAddress: string): Promise<string> => {
+  requestInvoiceWithCache: async (amountMsat: number, lnAddress: string): Promise<InvoiceResult> => {
     const { cache, prefetch, invalidate } = get();
     const isCacheValid = cache && (Date.now() - cache.fetchedAt < CACHE_MAX_AGE_MS);
 
     if (isCacheValid) {
       // Try using cached callback directly (skip step 1)
       try {
-        const invoice = await requestInvoice(cache.callback, amountMsat);
-        return invoice;
+        const result = await requestInvoice(cache.callback, amountMsat);
+        return result;
       } catch (e: any) {
         // If step 2 fails, callback may have changed — invalidate and retry once
         console.log('[LNURL Cache] Step 2 failed with cached callback, re-fetching step 1');

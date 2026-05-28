@@ -18,7 +18,7 @@ import { getSetting } from '../../../src/db/repositories/transactionRepo';
 import { setTableStatus, clearTable } from '../../../src/db/repositories/tableRepo';
 import { generatePromptPayQR } from '../../../src/lib/promptpay';
 import { getBtcRateThb, thbToSats } from '../../../src/lib/exchangeRate';
-import { fetchLnurlPayParams, requestInvoice, createTimingLog, reportTimingLog, parseInvoiceExpiry } from '../../../src/lib/lightning';
+import { fetchLnurlPayParams, requestInvoice, createTimingLog, reportTimingLog, parseInvoiceExpiry, checkVerifyUrl, pollInvoice } from '../../../src/lib/lightning';
 import { useLnurlCacheStore } from '../../../src/features/payment/lnurlCacheStore';
 import NumPad from '../../../src/components/NumPad';
 import type { PaymentMethod } from '../../../src/types';
@@ -42,8 +42,11 @@ export default function CheckoutScreen() {
   const [lnExpiry, setLnExpiry] = useState<number | null>(null); // epoch ms
   const [lnExpiryText, setLnExpiryText] = useState('');
   const [lnExpired, setLnExpired] = useState(false);
+  const [lnVerifyUrl, setLnVerifyUrl] = useState<string | null>(null);
+  const [lnAutoConfirmed, setLnAutoConfirmed] = useState(false);
   const [currentSerial, setCurrentSerial] = useState<number | null>(null);
   const expiryTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pollCleanupRef = useRef<(() => void) | null>(null);
   const [showCustomDiscount, setShowCustomDiscount] = useState(false);
   const [customDiscountValue, setCustomDiscountValue] = useState('');
   const [customDiscountType, setCustomDiscountType] = useState<'percent' | 'fixed'>('percent');
@@ -82,6 +85,20 @@ export default function CheckoutScreen() {
       };
     }
   }, [lnExpiry, lnExpired]);
+
+  // Cleanup poll on unmount or step change
+  useEffect(() => {
+    if (step !== 'lightning' && pollCleanupRef.current) {
+      pollCleanupRef.current();
+      pollCleanupRef.current = null;
+    }
+    return () => {
+      if (pollCleanupRef.current) {
+        pollCleanupRef.current();
+        pollCleanupRef.current = null;
+      }
+    };
+  }, [step]);
 
   const total = getTotal();
   const subtotal = getSubtotal();
@@ -168,6 +185,12 @@ export default function CheckoutScreen() {
         setLnExpired(false);
         setLnExpiry(null);
         setLnExpiryText('');
+        setLnVerifyUrl(null);
+        setLnAutoConfirmed(false);
+        if (pollCleanupRef.current) {
+          pollCleanupRef.current();
+          pollCleanupRef.current = null;
+        }
         setStep('lightning');
         const serial = getNextSerial();
         setCurrentSerial(serial);
@@ -202,15 +225,34 @@ export default function CheckoutScreen() {
           }
 
           timing.t3_startFetchInvoice = Date.now();
-          const invoice = await requestInvoiceWithCache(amountMsat, lnAddress);
+          const invoiceResult = await requestInvoiceWithCache(amountMsat, lnAddress);
           timing.t4_gotInvoice = Date.now();
 
-          setLnInvoice(invoice);
+          setLnInvoice(invoiceResult.pr);
+          setLnVerifyUrl(invoiceResult.verify);
+          setLnAutoConfirmed(false);
 
           // Parse expiry from invoice
-          const expiryMs = parseInvoiceExpiry(invoice);
+          const expiryMs = parseInvoiceExpiry(invoiceResult.pr);
           if (expiryMs) {
             setLnExpiry(expiryMs);
+          }
+
+          // Start polling verify URL if available
+          if (invoiceResult.verify) {
+            // Clean up any existing poll
+            pollCleanupRef.current?.();
+            const cleanup = pollInvoice(
+              () => checkVerifyUrl(invoiceResult.verify!),
+              () => {
+                setLnAutoConfirmed(true);
+              },
+              () => {
+                // expired via poll timeout — handled by expiry timer already
+              },
+              expiryMs ? expiryMs - Date.now() : 600_000
+            );
+            pollCleanupRef.current = cleanup;
           }
 
           timing.t5_qrRendered = Date.now();
@@ -377,6 +419,18 @@ export default function CheckoutScreen() {
     [items, finalTotal, discountAmount, serviceChargeAmount, vatAmount, vatIncluded, role, clear, paidSplits, remaining, tableId, lnInvoice, qrData, currentSerial]
   );
 
+  // Auto-confirm Lightning payment when verify URL reports settled
+  useEffect(() => {
+    if (lnAutoConfirmed && lnInvoice) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      if (splitMode !== 'none') {
+        recordSplitPayment('lightning', { amountSat: lnAmountSat, btcRate: lnRate });
+      } else {
+        completeOrder('lightning', { amountSat: lnAmountSat, btcRate: lnRate });
+      }
+    }
+  }, [lnAutoConfirmed]);
+
   if (step === 'done') {
     return (
       <SafeAreaView className="flex-1 bg-white items-center justify-center px-8">
@@ -541,9 +595,16 @@ export default function CheckoutScreen() {
                 <Text className="text-amber-700 text-sm font-medium text-center">{lnExpiryText}</Text>
               </View>
             ) : null}
-            <Text className="text-mekha-muted text-center text-sm mb-6">
-              ลูกค้าสแกน QR เพื่อชำระ{'\n'}กดยืนยันเมื่อเช็คสถานะเรียบร้อย
-            </Text>
+            {lnVerifyUrl ? (
+              <View className="flex-row items-center gap-2 mb-4">
+                <ActivityIndicator size="small" color="#7C3AED" />
+                <Text className="text-purple-700 text-sm font-medium">รอการยืนยันอัตโนมัติ...</Text>
+              </View>
+            ) : (
+              <Text className="text-mekha-muted text-center text-sm mb-4">
+                ลูกค้าสแกน QR เพื่อชำระ
+              </Text>
+            )}
             <Pressable
               className="w-full py-4 rounded-2xl items-center bg-purple-600"
               onPress={() => {

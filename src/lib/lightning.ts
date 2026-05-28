@@ -9,6 +9,13 @@ interface LnurlPayResponse {
 interface LnurlInvoiceResponse {
   pr: string;
   routes: unknown[];
+  verify?: string;
+  successAction?: { tag: string; message?: string; url?: string };
+}
+
+export interface InvoiceResult {
+  pr: string;
+  verify: string | null;
 }
 
 export interface LnTimingLog {
@@ -140,7 +147,7 @@ export async function requestInvoice(
   callbackUrl: string,
   amountMsat: number,
   timing?: LnTimingLog
-): Promise<string> {
+): Promise<InvoiceResult> {
   if (!callbackUrl) {
     throw new Error('Missing callback URL for invoice request');
   }
@@ -161,7 +168,7 @@ export async function requestInvoice(
 
   if (timing) timing.t4_gotInvoice = Date.now();
 
-  return data.pr;
+  return { pr: data.pr, verify: data.verify ?? null };
 }
 
 export function pollInvoice(
@@ -192,4 +199,21 @@ export function pollInvoice(
   }, 3_000);
 
   return () => clearInterval(interval);
+}
+
+/** Check payment status via verify URL (LNbits / common LNURL pattern) */
+export async function checkVerifyUrl(verifyUrl: string): Promise<'pending' | 'settled'> {
+  try {
+    const res = await fetch(verifyUrl);
+    if (!res.ok) return 'pending';
+    const data = await res.json();
+    // LNbits returns { settled: true/false }
+    // Some implementations return { paid: true/false } or { status: "OK" }
+    if (data.settled === true || data.paid === true || data.status === 'OK') {
+      return 'settled';
+    }
+    return 'pending';
+  } catch {
+    return 'pending';
+  }
 }

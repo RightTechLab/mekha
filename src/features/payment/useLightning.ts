@@ -69,7 +69,7 @@ export function useLightning(): UseLightningResult {
       }
 
       const inv = await requestInvoice(params.callback, amountMsat);
-      setInvoice(inv);
+      setInvoice(inv.pr);
       setLoading(false);
       return true;
     } catch (e: any) {
