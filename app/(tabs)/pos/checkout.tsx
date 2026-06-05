@@ -27,6 +27,19 @@ import QRCode from 'react-native-qrcode-svg';
 
 type CheckoutStep = 'summary' | 'payment' | 'cash' | 'promptpay' | 'lightning' | 'done';
 type SplitMode = 'none' | 'equal' | 'items';
+type SplitRecord = {
+  label: string;
+  amount: number;
+  method: PaymentMethod;
+  status: 'pending' | 'completed';
+  amountSat: number | null;
+  btcRate: number | null;
+  invoice: string | null;
+  verifyUrl: string | null;
+  qrRef: string | null;
+  serial: number | null;
+  transactionId: string | null;
+};
 
 function formatCountdown(ms: number): string {
   const totalSeconds = Math.max(0, Math.ceil(ms / 1000));
@@ -69,7 +82,8 @@ export default function CheckoutScreen() {
   const [showSplitOptions, setShowSplitOptions] = useState(false);
   const [selectedUnitIndices, setSelectedUnitIndices] = useState<Set<number>>(new Set());
   const [paidUnitIndices, setPaidUnitIndices] = useState<Set<number>>(new Set());
-  const [paidSplits, setPaidSplits] = useState<{ label: string; amount: number; method: PaymentMethod; amountSat: number | null; btcRate: number | null; invoice: string | null; qrRef: string | null; serial: number | null }[]>([]);
+  const [paidSplits, setPaidSplits] = useState<SplitRecord[]>([]);
+  const orderIdRef = useRef<string | null>(null);
 
   // Expiry countdown timer
   useEffect(() => {
@@ -157,8 +171,10 @@ export default function CheckoutScreen() {
     (sum, idx) => sum + (expandedUnits[idx]?.unitPayTotal ?? 0),
     0
   );
-  const totalPaid = paidSplits.reduce((sum, s) => sum + s.amount, 0);
-  const remaining = finalTotal - totalPaid;
+  const totalPaid = paidSplits.filter((s) => s.status === 'completed').reduce((sum, s) => sum + s.amount, 0);
+  const totalPending = paidSplits.filter((s) => s.status === 'pending').reduce((sum, s) => sum + s.amount, 0);
+  const totalAllocated = totalPaid + totalPending;
+  const remaining = finalTotal - totalAllocated;
   const currentPayAmount =
     splitMode === 'equal'
       ? splitPerPerson
@@ -182,6 +198,33 @@ export default function CheckoutScreen() {
     };
   };
 
+  const ensureOrder = () => {
+    if (orderIdRef.current) return orderIdRef.current;
+
+    const orderId = Crypto.randomUUID();
+    orderIdRef.current = orderId;
+    createOrder({ id: orderId, status: 'open', note: null, table_id: tableId });
+
+    if (tableId) {
+      setTableStatus(tableId, 'occupied', orderId);
+    }
+
+    for (const item of items) {
+      addOrderItem({
+        id: Crypto.randomUUID(),
+        order_id: orderId,
+        menu_id: item.menuId.startsWith('custom-') ? null : item.menuId,
+        menu_name: item.name,
+        unit_price: item.unitPrice,
+        quantity: item.quantity,
+        selected_options: JSON.stringify(item.selectedOptions),
+        item_total: item.itemTotal,
+      });
+    }
+
+    return orderId;
+  };
+
   const applySplitMode = (mode: SplitMode) => {
     setSplitMode(mode);
     setSelectedUnitIndices(new Set());
@@ -189,6 +232,26 @@ export default function CheckoutScreen() {
     setPaidSplits([]);
     if (mode !== 'equal') setCustomerCount(1);
     if (mode === 'equal') setCustomerCount(2);
+  };
+
+  const getSplitLabel = (method: PaymentMethod) => {
+    if (splitMode === 'equal') {
+      return `คนที่ ${paidSplits.length + 1} (${method})`;
+    }
+    if (splitMode === 'items') {
+      const selectedNames = Array.from(selectedUnitIndices).map((i) => expandedUnits[i]?.name).filter(Boolean);
+      return `${selectedNames.join(', ')} (${method})`;
+    }
+    return `ชำระเต็มบิล (${method})`;
+  };
+
+  const markSelectedUnitsAllocated = () => {
+    if (splitMode === 'items') {
+      const newPaid = new Set(paidUnitIndices);
+      selectedUnitIndices.forEach((idx) => newPaid.add(idx));
+      setPaidUnitIndices(newPaid);
+    }
+    setSelectedUnitIndices(new Set());
   };
 
   const handleSplitModeChange = (mode: SplitMode) => {
@@ -326,32 +389,23 @@ export default function CheckoutScreen() {
   const recordSplitPayment = useCallback(
     (method: PaymentMethod, extra?: { amountSat: number; btcRate: number }) => {
       const payAmount = getPayableAmount();
-      let label: string;
-      if (splitMode === 'equal') {
-        label = `คนที่ ${paidSplits.length + 1} (${method})`;
-      } else {
-        const selectedNames = Array.from(selectedUnitIndices).map((i) => expandedUnits[i]?.name).filter(Boolean);
-        label = `${selectedNames.join(', ')} (${method})`;
-      }
+      const label = getSplitLabel(method);
       const newSplits = [...paidSplits, {
         label,
         amount: payAmount,
         method,
+        status: 'completed' as const,
         amountSat: extra?.amountSat ?? null,
         btcRate: extra?.btcRate ?? null,
         invoice: method === 'lightning' ? lnInvoice : null,
+        verifyUrl: method === 'lightning' ? lnVerifyUrl : null,
         qrRef: method === 'promptpay' ? qrData : null,
         serial: method === 'cash' ? null : currentSerial,
+        transactionId: null,
       }];
       setPaidSplits(newSplits);
 
-      // Mark selected units as paid
-      if (splitMode === 'items') {
-        const newPaid = new Set(paidUnitIndices);
-        selectedUnitIndices.forEach((idx) => newPaid.add(idx));
-        setPaidUnitIndices(newPaid);
-      }
-      setSelectedUnitIndices(new Set());
+      markSelectedUnitsAllocated();
 
       const newTotalPaid = newSplits.reduce((sum, s) => sum + s.amount, 0);
       if (newTotalPaid >= finalTotal - 0.01) {
@@ -360,47 +414,75 @@ export default function CheckoutScreen() {
         setStep('summary');
       }
     },
-    [splitMode, paidSplits, selectedUnitIndices, expandedUnits, paidUnitIndices, finalTotal, lnInvoice, qrData, currentSerial]
+    [splitMode, paidSplits, selectedUnitIndices, expandedUnits, paidUnitIndices, finalTotal, lnInvoice, lnVerifyUrl, qrData, currentSerial]
+  );
+
+  const recordPendingPayment = useCallback(
+    async (method: PaymentMethod, extra?: { amountSat?: number; btcRate?: number }) => {
+      const payAmount = getPayableAmount();
+      const orderId = ensureOrder();
+      const share = getSplitAdjustmentShare(payAmount);
+      const transactionId = Crypto.randomUUID();
+      const pending: SplitRecord = {
+        label: getSplitLabel(method),
+        amount: payAmount,
+        method,
+        status: 'pending',
+        amountSat: extra?.amountSat ?? null,
+        btcRate: extra?.btcRate ?? null,
+        invoice: method === 'lightning' ? lnInvoice : null,
+        verifyUrl: method === 'lightning' ? lnVerifyUrl : null,
+        qrRef: method === 'promptpay' ? qrData : null,
+        serial: method === 'cash' ? null : currentSerial,
+        transactionId,
+      };
+
+      createTransaction({
+        id: transactionId,
+        order_id: orderId,
+        payment_method: method,
+        amount_thb: payAmount,
+        amount_sat: pending.amountSat,
+        btc_rate_thb: pending.btcRate,
+        discount_amount: share.discountAmount,
+        service_charge_amount: share.serviceChargeAmount,
+        vat_amount: share.vatAmount,
+        vat_included: vatIncluded ? 1 : 0,
+        serial_number: pending.serial,
+        status: 'pending',
+        lightning_invoice: pending.invoice,
+        lightning_verify_url: pending.verifyUrl,
+        lightning_preimage: null,
+        promptpay_ref: pending.qrRef,
+        cashier_id: role,
+        void_reason: null,
+      });
+
+      const newSplits = [...paidSplits, pending];
+      setPaidSplits(newSplits);
+      markSelectedUnitsAllocated();
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+
+      const newAllocated = newSplits.reduce((sum, s) => sum + s.amount, 0);
+      if (newAllocated >= finalTotal - 0.01) {
+        clear();
+        setStep('done');
+      } else {
+        setStep('summary');
+      }
+    },
+    [paidSplits, splitMode, selectedUnitIndices, expandedUnits, paidUnitIndices, finalTotal, lnInvoice, lnVerifyUrl, qrData, currentSerial, vatIncluded, role, clear]
   );
 
   const completeOrder = useCallback(
     async (method: PaymentMethod, extra?: { amountSat?: number; btcRate?: number }, splitsOverride?: typeof paidSplits) => {
-      const orderId = Crypto.randomUUID();
+      const orderId = ensureOrder();
       const splits = splitsOverride ?? paidSplits;
-
-      // Create order with table link
-      createOrder({ id: orderId, status: 'open', note: null, table_id: tableId });
-
-      // Mark table as occupied
-      if (tableId) {
-        setTableStatus(tableId, 'occupied', orderId);
-      }
-
-      // Add order items
-      for (const item of items) {
-        addOrderItem({
-          id: Crypto.randomUUID(),
-          order_id: orderId,
-          menu_id: item.menuId.startsWith('custom-') ? null : item.menuId,
-          menu_name: item.name,
-          unit_price: item.unitPrice,
-          quantity: item.quantity,
-          selected_options: JSON.stringify(item.selectedOptions),
-          item_total: item.itemTotal,
-        });
-      }
-
-      // Mark order paid
-      updateOrderStatus(orderId, 'paid');
-
-      // Free up the table
-      if (tableId) {
-        clearTable(tableId);
-      }
 
       if (splits.length > 0) {
         // Split bill — create transaction per split
         for (const split of splits) {
+          if (split.status === 'pending' || split.transactionId) continue;
           const share = getSplitAdjustmentShare(split.amount);
           createTransaction({
             id: Crypto.randomUUID(),
@@ -416,7 +498,7 @@ export default function CheckoutScreen() {
             serial_number: split.serial,
             status: 'completed',
             lightning_invoice: split.invoice ?? (split.method === 'lightning' ? lnInvoice : null),
-            lightning_verify_url: split.method === 'lightning' ? lnVerifyUrl : null,
+            lightning_verify_url: split.verifyUrl ?? (split.method === 'lightning' ? lnVerifyUrl : null),
             lightning_preimage: null,
             promptpay_ref: split.qrRef ?? (split.method === 'promptpay' ? qrData : null),
             cashier_id: role,
@@ -471,6 +553,14 @@ export default function CheckoutScreen() {
           cashier_id: role,
           void_reason: null,
         });
+      }
+
+      const hasPending = splits.some((split) => split.status === 'pending');
+      if (!hasPending) {
+        updateOrderStatus(orderId, 'paid');
+        if (tableId) {
+          clearTable(tableId);
+        }
       }
 
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -597,8 +687,17 @@ export default function CheckoutScreen() {
           <Text className="text-white font-semibold">ยืนยันรับเงิน</Text>
         </Pressable>
 
+        <Pressable
+          className="mt-3 w-full py-4 rounded-2xl items-center bg-purple-50 border border-purple-200"
+          onPress={() => recordPendingPayment('promptpay')}
+        >
+          <Text className="text-purple-700 font-semibold">
+            พักไว้ / ไปคิดคนถัดไป
+          </Text>
+        </Pressable>
+
         <Pressable className="mt-3 items-center" onPress={() => setStep('summary')}>
-          <Text className="text-mekha-muted">ยกเลิก</Text>
+          <Text className="text-mekha-muted">ย้อนกลับโดยไม่บันทึก</Text>
         </Pressable>
       </SafeAreaView>
     );
@@ -685,11 +784,19 @@ export default function CheckoutScreen() {
             >
               <Text className="text-white font-semibold">ยืนยันรับเงิน</Text>
             </Pressable>
+            <Pressable
+              className="mt-3 w-full py-4 rounded-2xl items-center bg-purple-50 border border-purple-200"
+              onPress={() => recordPendingPayment('lightning', { amountSat: lnAmountSat, btcRate: lnRate })}
+            >
+              <Text className="text-purple-700 font-semibold">
+                พักไว้ / ไปคิดคนถัดไป
+              </Text>
+            </Pressable>
           </>
         ) : null}
 
         <Pressable className="mt-3 items-center" onPress={() => setStep('summary')}>
-          <Text className="text-mekha-muted">ยกเลิก</Text>
+          <Text className="text-mekha-muted">ย้อนกลับโดยไม่บันทึก</Text>
         </Pressable>
       </SafeAreaView>
     );
