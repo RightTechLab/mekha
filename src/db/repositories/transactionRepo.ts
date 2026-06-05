@@ -1,10 +1,10 @@
 import db from '../client';
-import type { Transaction, AuditLog } from '../../types';
+import type { PaymentMethod, Transaction, AuditLog, TransactionStatus } from '../../types';
 
 export function createTransaction(txn: Omit<Transaction, 'created_at'>): void {
   db.runSync(
-    `INSERT INTO transactions (id, order_id, payment_method, amount_thb, amount_sat, btc_rate_thb, discount_amount, service_charge_amount, vat_amount, vat_included, serial_number, status, lightning_invoice, lightning_preimage, promptpay_ref, cashier_id, void_reason)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO transactions (id, order_id, payment_method, amount_thb, amount_sat, btc_rate_thb, discount_amount, service_charge_amount, vat_amount, vat_included, serial_number, status, lightning_invoice, lightning_verify_url, lightning_preimage, promptpay_ref, cashier_id, void_reason)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       txn.id,
       txn.order_id,
@@ -19,10 +19,68 @@ export function createTransaction(txn: Omit<Transaction, 'created_at'>): void {
       txn.serial_number,
       txn.status,
       txn.lightning_invoice,
+      txn.lightning_verify_url,
       txn.lightning_preimage,
       txn.promptpay_ref,
       txn.cashier_id,
       txn.void_reason,
+    ]
+  );
+}
+
+export function updateTransactionStatus(
+  id: string,
+  status: TransactionStatus,
+  data?: { lightningPreimage?: string | null; voidReason?: string | null }
+): void {
+  db.runSync(
+    `UPDATE transactions
+     SET status = ?, lightning_preimage = COALESCE(?, lightning_preimage), void_reason = COALESCE(?, void_reason)
+     WHERE id = ?`,
+    [status, data?.lightningPreimage ?? null, data?.voidReason ?? null, id]
+  );
+}
+
+export function completeTransaction(id: string): void {
+  updateTransactionStatus(id, 'completed');
+}
+
+export function cancelTransaction(id: string, reason?: string): void {
+  updateTransactionStatus(id, 'cancelled', { voidReason: reason ?? null });
+}
+
+export function updatePendingTransactionMethod(
+  id: string,
+  data: {
+    paymentMethod: PaymentMethod;
+    amountSat?: number | null;
+    btcRateThb?: number | null;
+    lightningInvoice?: string | null;
+    lightningVerifyUrl?: string | null;
+    promptpayRef?: string | null;
+    serialNumber?: number | null;
+  }
+): void {
+  db.runSync(
+    `UPDATE transactions
+     SET payment_method = ?,
+         amount_sat = ?,
+         btc_rate_thb = ?,
+         lightning_invoice = ?,
+         lightning_verify_url = ?,
+         promptpay_ref = ?,
+         serial_number = ?,
+         status = 'pending'
+     WHERE id = ? AND status = 'pending'`,
+    [
+      data.paymentMethod,
+      data.amountSat ?? null,
+      data.btcRateThb ?? null,
+      data.lightningInvoice ?? null,
+      data.lightningVerifyUrl ?? null,
+      data.promptpayRef ?? null,
+      data.serialNumber ?? null,
+      id,
     ]
   );
 }

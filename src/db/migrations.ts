@@ -1,7 +1,7 @@
 import db from './client';
 import { CREATE_TABLES } from './schema';
 
-const CURRENT_VERSION = 5;
+const CURRENT_VERSION = 6;
 
 export function runMigrations(): void {
   db.execSync('PRAGMA journal_mode = WAL;');
@@ -91,6 +91,14 @@ export function runMigrations(): void {
     db.runSync(
       `INSERT OR IGNORE INTO settings (key, value) VALUES ('qr_serial_counter', '0')`
     );
+  }
+
+  if (currentVersion < 6) {
+    try {
+      db.execSync('ALTER TABLE transactions ADD COLUMN lightning_verify_url TEXT;');
+    } catch (_) {
+      // Column may already exist
+    }
   }
 
   db.execSync(`PRAGMA user_version = ${CURRENT_VERSION};`);

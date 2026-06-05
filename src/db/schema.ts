@@ -59,6 +59,7 @@ CREATE TABLE IF NOT EXISTS transactions (
   serial_number     INTEGER,
   status            TEXT DEFAULT 'completed',
   lightning_invoice TEXT,
+  lightning_verify_url TEXT,
   lightning_preimage TEXT,
   promptpay_ref     TEXT,
   cashier_id        TEXT,

@@ -4,7 +4,7 @@ export type PaymentMethod = 'cash' | 'promptpay' | 'lightning';
 
 export type OrderStatus = 'open' | 'held' | 'paid' | 'voided';
 
-export type TransactionStatus = 'completed' | 'voided' | 'refunded';
+export type TransactionStatus = 'pending' | 'completed' | 'expired' | 'cancelled' | 'voided' | 'refunded';
 
 export type UserRole = 'owner' | 'cashier';
 
@@ -70,6 +70,7 @@ export interface Transaction {
   serial_number: number | null;
   status: TransactionStatus;
   lightning_invoice: string | null;
+  lightning_verify_url: string | null;
   lightning_preimage: string | null;
   promptpay_ref: string | null;
   cashier_id: string | null;
