@@ -8,12 +8,14 @@ import * as SecureStore from 'expo-secure-store';
 import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
 import QRCode from 'react-native-qrcode-svg';
-import { cancelTransaction, completeTransaction, getTransactions, getTransactionsByOrderId, updateTransactionStatus } from '../../../src/db/repositories/transactionRepo';
+import { cancelTransaction, completeTransaction, getNextSerial, getTransactions, getTransactionsByOrderId, updatePendingTransactionMethod, updateTransactionStatus } from '../../../src/db/repositories/transactionRepo';
 import { getOrderItems, updateOrderStatus } from '../../../src/db/repositories/orderRepo';
 import { useSessionStore } from '../../../src/features/auth/sessionStore';
 import { generatePromptPayQR } from '../../../src/lib/promptpay';
 import { checkVerifyUrl, parseInvoiceExpiry } from '../../../src/lib/lightning';
-import type { Transaction, OrderItem } from '../../../src/types';
+import { getBtcRateThb, thbToSats } from '../../../src/lib/exchangeRate';
+import { useLnurlCacheStore } from '../../../src/features/payment/lnurlCacheStore';
+import type { PaymentMethod, Transaction, OrderItem } from '../../../src/types';
 
 const METHOD_LABELS: Record<string, string> = {
   cash: 'เงินสด',
@@ -280,6 +282,96 @@ function TransactionCard({ txn, onChanged }: { txn: Transaction; onChanged: () =
     }
     Alert.alert('ยังไม่พบการชำระ', 'ยังตรวจไม่พบการจ่าย Lightning รายการนี้');
   };
+  const handleSwitchMethod = async (target: Transaction, method: PaymentMethod) => {
+    if (target.status !== 'pending' || method === target.payment_method) return;
+
+    try {
+      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
+      if (method === 'cash') {
+        updatePendingTransactionMethod(target.id, {
+          paymentMethod: 'cash',
+          amountSat: null,
+          btcRateThb: null,
+          lightningInvoice: null,
+          lightningVerifyUrl: null,
+          promptpayRef: null,
+          serialNumber: null,
+        });
+        refreshRelated();
+        return;
+      }
+
+      const serial = getNextSerial();
+      if (method === 'promptpay') {
+        const promptpayId = await SecureStore.getItemAsync('mekha.promptpay_id');
+        if (!promptpayId) {
+          Alert.alert('ยังไม่ได้ตั้งค่า', 'กรุณาตั้งค่า PromptPay ID ในหน้าตั้งค่าก่อน');
+          return;
+        }
+        const qr = generatePromptPayQR(promptpayId, target.amount_thb);
+        updatePendingTransactionMethod(target.id, {
+          paymentMethod: 'promptpay',
+          amountSat: null,
+          btcRateThb: null,
+          lightningInvoice: null,
+          lightningVerifyUrl: null,
+          promptpayRef: qr,
+          serialNumber: serial,
+        });
+        const updatedTxn = {
+          ...target,
+          payment_method: 'promptpay' as const,
+          amount_sat: null,
+          btc_rate_thb: null,
+          lightning_invoice: null,
+          lightning_verify_url: null,
+          promptpay_ref: qr,
+          serial_number: serial,
+        };
+        setQrTxn(updatedTxn);
+        setQrData(qr);
+        setShowQr(true);
+        refreshRelated();
+        return;
+      }
+
+      const lnAddress = await SecureStore.getItemAsync('mekha.ln_address');
+      if (!lnAddress) {
+        Alert.alert('ยังไม่ได้ตั้งค่า', 'กรุณาตั้งค่า Lightning Address ในหน้าตั้งค่าก่อน');
+        return;
+      }
+      const rate = await getBtcRateThb();
+      const amountSat = thbToSats(target.amount_thb, rate);
+      const invoiceResult = await useLnurlCacheStore.getState().requestInvoiceWithCache(amountSat * 1000, lnAddress);
+      updatePendingTransactionMethod(target.id, {
+        paymentMethod: 'lightning',
+        amountSat,
+        btcRateThb: rate,
+        lightningInvoice: invoiceResult.pr,
+        lightningVerifyUrl: invoiceResult.verify,
+        promptpayRef: null,
+        serialNumber: serial,
+      });
+      const updatedTxn = {
+        ...target,
+        payment_method: 'lightning' as const,
+        amount_sat: amountSat,
+        btc_rate_thb: rate,
+        lightning_invoice: invoiceResult.pr,
+        lightning_verify_url: invoiceResult.verify,
+        promptpay_ref: null,
+        serial_number: serial,
+      };
+      setQrTxn(updatedTxn);
+      setQrData(invoiceResult.pr);
+      setShowQr(true);
+      refreshRelated();
+    } catch (e: any) {
+      Alert.alert('ผิดพลาด', e?.message ?? 'ไม่สามารถเปลี่ยนวิธีชำระได้');
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+    }
+  };
   const handleCopyInvoice = async () => {
     if (qrTxn.payment_method !== 'lightning' || !qrData) return;
     await Clipboard.setStringAsync(qrData);
@@ -398,6 +490,7 @@ function TransactionCard({ txn, onChanged }: { txn: Transaction; onChanged: () =
           onConfirm={handleConfirmPending}
           onCancel={handleCancelPending}
           onCheckLightning={handleCheckLightning}
+          onSwitchMethod={handleSwitchMethod}
         />
       )}
       {expanded && isSplitGroup && splitTxns.filter((st) => st.payment_method === 'promptpay' || st.payment_method === 'lightning').length > 0 && (
@@ -442,6 +535,7 @@ function TransactionCard({ txn, onChanged }: { txn: Transaction; onChanged: () =
               onConfirm={handleConfirmPending}
               onCancel={handleCancelPending}
               onCheckLightning={handleCheckLightning}
+              onSwitchMethod={handleSwitchMethod}
             />
           ))}
         </View>
@@ -510,14 +604,41 @@ function PendingActions({
   onConfirm,
   onCancel,
   onCheckLightning,
+  onSwitchMethod,
 }: {
   txn: Transaction;
   onConfirm: (txn: Transaction) => void;
   onCancel: (txn: Transaction) => void;
   onCheckLightning: (txn: Transaction) => void;
+  onSwitchMethod: (txn: Transaction, method: PaymentMethod) => void;
 }) {
+  const switchTargets = (['cash', 'promptpay', 'lightning'] as PaymentMethod[]).filter(
+    (method) => method !== txn.payment_method
+  );
+
   return (
     <View className="mt-2 gap-2">
+      <View className="bg-mekha-surface border border-mekha-border rounded-xl px-3 py-2">
+        <Text className="text-xs font-semibold text-mekha-text mb-2">
+          เปลี่ยนวิธีชำระ
+        </Text>
+        <View className="flex-row gap-2">
+          {switchTargets.map((method) => (
+            <Pressable
+              key={method}
+              className="flex-1 bg-white border border-mekha-border py-2 rounded-lg items-center"
+              onPress={(e) => {
+                e.stopPropagation?.();
+                onSwitchMethod(txn, method);
+              }}
+            >
+              <Text className="text-xs font-medium text-purple-700">
+                {METHOD_LABELS[method]}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+      </View>
       {txn.payment_method === 'lightning' && (
         <Pressable
           className="bg-amber-50 border border-amber-200 py-2 rounded-xl items-center"
