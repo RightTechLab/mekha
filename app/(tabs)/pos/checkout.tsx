@@ -268,6 +268,30 @@ export default function CheckoutScreen() {
     return Array.from(selectedUnitIndices);
   };
 
+  const persistCompletedSplit = (orderId: string, split: SplitRecord) => {
+    const share = getSplitAdjustmentShare(split.amount);
+    createTransaction({
+      id: Crypto.randomUUID(),
+      order_id: orderId,
+      payment_method: split.method,
+      amount_thb: split.amount,
+      amount_sat: split.amountSat,
+      btc_rate_thb: split.btcRate,
+      discount_amount: share.discountAmount,
+      service_charge_amount: share.serviceChargeAmount,
+      vat_amount: share.vatAmount,
+      vat_included: vatIncluded ? 1 : 0,
+      serial_number: split.serial,
+      status: 'completed',
+      lightning_invoice: split.invoice ?? (split.method === 'lightning' ? lnInvoice : null),
+      lightning_verify_url: split.verifyUrl ?? (split.method === 'lightning' ? lnVerifyUrl : null),
+      lightning_preimage: null,
+      promptpay_ref: split.qrRef ?? (split.method === 'promptpay' ? qrData : null),
+      cashier_id: role,
+      void_reason: null,
+    });
+  };
+
   const closeOrderIfReady = useCallback(
     async (splits: SplitRecord[]) => {
       const hasPending = splits.some((split) => split.status === 'pending');
@@ -277,6 +301,11 @@ export default function CheckoutScreen() {
 
       if (!hasPending && completedTotal >= finalTotal - 0.01) {
         const orderId = ensureOrder();
+        for (const split of splits) {
+          if (split.status === 'completed' && !split.transactionId) {
+            persistCompletedSplit(orderId, split);
+          }
+        }
         updateOrderStatus(orderId, 'paid');
         if (tableId) {
           clearTable(tableId);
@@ -289,7 +318,7 @@ export default function CheckoutScreen() {
 
       return false;
     },
-    [finalTotal, tableId, clear]
+    [finalTotal, tableId, clear, vatIncluded, lnInvoice, lnVerifyUrl, qrData, role]
   );
 
   const handleSplitModeChange = (mode: SplitMode) => {
@@ -524,27 +553,7 @@ export default function CheckoutScreen() {
         // Split bill — create transaction per split
         for (const split of splits) {
           if (split.status === 'pending' || split.transactionId) continue;
-          const share = getSplitAdjustmentShare(split.amount);
-          createTransaction({
-            id: Crypto.randomUUID(),
-            order_id: orderId,
-            payment_method: split.method,
-            amount_thb: split.amount,
-            amount_sat: split.amountSat,
-            btc_rate_thb: split.btcRate,
-            discount_amount: share.discountAmount,
-            service_charge_amount: share.serviceChargeAmount,
-            vat_amount: share.vatAmount,
-            vat_included: vatIncluded ? 1 : 0,
-            serial_number: split.serial,
-            status: 'completed',
-            lightning_invoice: split.invoice ?? (split.method === 'lightning' ? lnInvoice : null),
-            lightning_verify_url: split.verifyUrl ?? (split.method === 'lightning' ? lnVerifyUrl : null),
-            lightning_preimage: null,
-            promptpay_ref: split.qrRef ?? (split.method === 'promptpay' ? qrData : null),
-            cashier_id: role,
-            void_reason: null,
-          });
+          persistCompletedSplit(orderId, split);
         }
         // Last split (current payment) — only if remaining after all recorded splits
         const splitTotal = splits.reduce((sum, s) => sum + s.amount, 0);
