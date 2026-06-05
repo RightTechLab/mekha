@@ -466,7 +466,7 @@ export default function CheckoutScreen() {
       const newAllocated = newSplits.reduce((sum, s) => sum + s.amount, 0);
       if (newAllocated >= finalTotal - 0.01) {
         clear();
-        setStep('done');
+        router.back();
       } else {
         setStep('summary');
       }
@@ -565,7 +565,7 @@ export default function CheckoutScreen() {
 
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       clear();
-      setStep('done');
+      router.back();
     },
     [items, finalTotal, discountAmount, serviceChargeAmount, vatAmount, vatIncluded, role, clear, paidSplits, remaining, tableId, lnInvoice, qrData, currentSerial]
   );
@@ -581,28 +581,6 @@ export default function CheckoutScreen() {
       }
     }
   }, [lnAutoConfirmed]);
-
-  if (step === 'done') {
-    return (
-      <SafeAreaView className="flex-1 bg-white items-center justify-center px-8">
-        <Ionicons name="checkmark-circle" size={64} color="#22C55E" style={{ marginBottom: 16 }} />
-        <Text className="text-2xl font-bold text-mekha-text mb-2">สำเร็จ!</Text>
-        {tableName && (
-          <View className="flex-row items-center gap-1 mb-1">
-            <Ionicons name="grid-outline" size={16} color="#7C3AED" />
-            <Text className="text-purple-600 font-medium">{tableName}</Text>
-          </View>
-        )}
-        <Text className="text-mekha-muted mb-8">บันทึกธุรกรรมเรียบร้อยแล้ว</Text>
-        <Pressable
-          className="bg-purple-600 px-8 py-4 rounded-2xl"
-          onPress={() => router.back()}
-        >
-          <Text className="text-white font-semibold">กลับหน้า POS</Text>
-        </Pressable>
-      </SafeAreaView>
-    );
-  }
 
   if (step === 'cash') {
     const payAmount = splitMode !== 'none' ? getPayableAmount() : finalTotal;
