@@ -14,7 +14,13 @@ import {
   addOrderItem,
   updateOrderStatus,
 } from '../../../src/db/repositories/orderRepo';
-import { createTransaction, getNextSerial } from '../../../src/db/repositories/transactionRepo';
+import {
+  cancelTransaction,
+  completeTransaction,
+  createTransaction,
+  getNextSerial,
+  updatePendingTransactionMethod,
+} from '../../../src/db/repositories/transactionRepo';
 import { getSetting } from '../../../src/db/repositories/transactionRepo';
 import { setTableStatus, clearTable } from '../../../src/db/repositories/tableRepo';
 import { generatePromptPayQR } from '../../../src/lib/promptpay';
@@ -39,6 +45,7 @@ type SplitRecord = {
   qrRef: string | null;
   serial: number | null;
   transactionId: string | null;
+  unitIndices: number[];
 };
 
 function formatCountdown(ms: number): string {
@@ -83,6 +90,7 @@ export default function CheckoutScreen() {
   const [selectedUnitIndices, setSelectedUnitIndices] = useState<Set<number>>(new Set());
   const [paidUnitIndices, setPaidUnitIndices] = useState<Set<number>>(new Set());
   const [paidSplits, setPaidSplits] = useState<SplitRecord[]>([]);
+  const [activePendingIndex, setActivePendingIndex] = useState<number | null>(null);
   const orderIdRef = useRef<string | null>(null);
 
   // Expiry countdown timer
@@ -181,6 +189,7 @@ export default function CheckoutScreen() {
       : splitMode === 'items'
         ? selectedItemsTotal
         : finalTotal;
+  const activePendingSplit = activePendingIndex != null ? paidSplits[activePendingIndex] : null;
 
   const getPayableAmount = () => {
     if (splitMode === 'none') return finalTotal;
@@ -253,6 +262,35 @@ export default function CheckoutScreen() {
     }
     setSelectedUnitIndices(new Set());
   };
+
+  const getSelectedUnitSnapshot = () => {
+    if (splitMode !== 'items') return [];
+    return Array.from(selectedUnitIndices);
+  };
+
+  const closeOrderIfReady = useCallback(
+    async (splits: SplitRecord[]) => {
+      const hasPending = splits.some((split) => split.status === 'pending');
+      const completedTotal = splits
+        .filter((split) => split.status === 'completed')
+        .reduce((sum, split) => sum + split.amount, 0);
+
+      if (!hasPending && completedTotal >= finalTotal - 0.01) {
+        const orderId = ensureOrder();
+        updateOrderStatus(orderId, 'paid');
+        if (tableId) {
+          clearTable(tableId);
+        }
+        await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        clear();
+        router.back();
+        return true;
+      }
+
+      return false;
+    },
+    [finalTotal, tableId, clear]
+  );
 
   const handleSplitModeChange = (mode: SplitMode) => {
     if (mode === splitMode) return;
@@ -402,6 +440,7 @@ export default function CheckoutScreen() {
         qrRef: method === 'promptpay' ? qrData : null,
         serial: method === 'cash' ? null : currentSerial,
         transactionId: null,
+        unitIndices: getSelectedUnitSnapshot(),
       }];
       setPaidSplits(newSplits);
 
@@ -437,6 +476,7 @@ export default function CheckoutScreen() {
         qrRef: method === 'promptpay' ? qrData : null,
         serial: method === 'cash' ? null : currentSerial,
         transactionId,
+        unitIndices: getSelectedUnitSnapshot(),
       };
 
       createTransaction({
@@ -575,11 +615,230 @@ export default function CheckoutScreen() {
     [items, finalTotal, discountAmount, serviceChargeAmount, vatAmount, vatIncluded, role, clear, paidSplits, remaining, tableId, lnInvoice, qrData, currentSerial]
   );
 
+  const confirmPendingSplit = useCallback(
+    async (index: number) => {
+      const target = paidSplits[index];
+      if (!target || target.status !== 'pending') return;
+
+      if (target.transactionId) {
+        completeTransaction(target.transactionId);
+      }
+
+      const nextSplits = paidSplits.map((split, i) =>
+        i === index ? { ...split, status: 'completed' as const } : split
+      );
+      setPaidSplits(nextSplits);
+      setActivePendingIndex(null);
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+
+      const closed = await closeOrderIfReady(nextSplits);
+      if (!closed) {
+        setStep('summary');
+      }
+    },
+    [paidSplits, closeOrderIfReady]
+  );
+
+  const cancelPendingSplit = useCallback(
+    (index: number) => {
+      const target = paidSplits[index];
+      if (!target || target.status !== 'pending') return;
+
+      Alert.alert('ยกเลิกรายการรอชำระ', `ต้องการยกเลิก ${target.label} หรือไม่?`, [
+        { text: 'ไม่ยกเลิก', style: 'cancel' },
+        {
+          text: 'ยกเลิกรายการ',
+          style: 'destructive',
+          onPress: () => {
+            if (target.transactionId) {
+              cancelTransaction(target.transactionId, 'cancelled from checkout');
+            }
+            const nextSplits = paidSplits.filter((_, i) => i !== index);
+            setPaidSplits(nextSplits);
+            if (splitMode === 'items') {
+              const nextPaid = new Set(paidUnitIndices);
+              target.unitIndices.forEach((unitIndex) => nextPaid.delete(unitIndex));
+              setPaidUnitIndices(nextPaid);
+            }
+            setActivePendingIndex(null);
+            setStep('summary');
+          },
+        },
+      ]);
+    },
+    [paidSplits, splitMode, paidUnitIndices]
+  );
+
+  const openPendingSplit = useCallback(
+    (index: number) => {
+      const target = paidSplits[index];
+      if (!target || target.status !== 'pending') return;
+
+      setActivePendingIndex(index);
+      setCurrentSerial(target.serial);
+      setQrData(target.qrRef ?? '');
+      setLnInvoice(target.invoice ?? '');
+      setLnVerifyUrl(target.verifyUrl);
+      setLnAmountSat(target.amountSat ?? 0);
+      setLnRate(target.btcRate ?? 0);
+      setLnAutoConfirmed(false);
+
+      if (target.method === 'promptpay') {
+        setStep('promptpay');
+      } else if (target.method === 'lightning') {
+        const expiryMs = target.invoice ? parseInvoiceExpiry(target.invoice) : null;
+        setLnExpiry(expiryMs);
+        setLnExpired(expiryMs ? Date.now() >= expiryMs : false);
+        setLnLoading(false);
+        setLnError('');
+        if (pollCleanupRef.current) {
+          pollCleanupRef.current();
+          pollCleanupRef.current = null;
+        }
+        if (target.verifyUrl && (!expiryMs || Date.now() < expiryMs)) {
+          pollCleanupRef.current = pollInvoice(
+            () => checkVerifyUrl(target.verifyUrl!),
+            () => {
+              setLnAutoConfirmed(true);
+            },
+            () => {},
+            expiryMs ? expiryMs - Date.now() : 600_000
+          );
+        }
+        setStep('lightning');
+      }
+    },
+    [paidSplits]
+  );
+
+  const switchPendingSplitMethod = useCallback(
+    async (index: number, method: PaymentMethod) => {
+      const target = paidSplits[index];
+      if (!target || target.status !== 'pending' || method === target.method || !target.transactionId) return;
+
+      try {
+        await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
+        if (method === 'cash') {
+          updatePendingTransactionMethod(target.transactionId, {
+            paymentMethod: 'cash',
+            amountSat: null,
+            btcRateThb: null,
+            lightningInvoice: null,
+            lightningVerifyUrl: null,
+            promptpayRef: null,
+            serialNumber: null,
+          });
+          setPaidSplits((splits) => splits.map((split, i) =>
+            i === index
+              ? { ...split, method: 'cash', amountSat: null, btcRate: null, invoice: null, verifyUrl: null, qrRef: null, serial: null }
+              : split
+          ));
+          setStep('summary');
+          return;
+        }
+
+        const serial = getNextSerial();
+        if (method === 'promptpay') {
+          const promptpayId = await SecureStore.getItemAsync('mekha.promptpay_id');
+          if (!promptpayId) {
+            Alert.alert('ยังไม่ได้ตั้งค่า', 'กรุณาตั้งค่า PromptPay ID ในหน้าตั้งค่าก่อน');
+            return;
+          }
+          const qr = generatePromptPayQR(promptpayId, target.amount);
+          updatePendingTransactionMethod(target.transactionId, {
+            paymentMethod: 'promptpay',
+            amountSat: null,
+            btcRateThb: null,
+            lightningInvoice: null,
+            lightningVerifyUrl: null,
+            promptpayRef: qr,
+            serialNumber: serial,
+          });
+          setPaidSplits((splits) => splits.map((split, i) =>
+            i === index
+              ? { ...split, method: 'promptpay', amountSat: null, btcRate: null, invoice: null, verifyUrl: null, qrRef: qr, serial }
+              : split
+          ));
+          setActivePendingIndex(index);
+          setCurrentSerial(serial);
+          setQrData(qr);
+          setStep('promptpay');
+          return;
+        }
+
+        const lnAddress = await SecureStore.getItemAsync('mekha.ln_address');
+        if (!lnAddress) {
+          Alert.alert('ยังไม่ได้ตั้งค่า', 'กรุณาตั้งค่า Lightning Address ในหน้าตั้งค่าก่อน');
+          return;
+        }
+        const rate = await getBtcRateThb();
+        const amountSat = thbToSats(target.amount, rate);
+        const invoiceResult = await useLnurlCacheStore.getState().requestInvoiceWithCache(amountSat * 1000, lnAddress);
+        updatePendingTransactionMethod(target.transactionId, {
+          paymentMethod: 'lightning',
+          amountSat,
+          btcRateThb: rate,
+          lightningInvoice: invoiceResult.pr,
+          lightningVerifyUrl: invoiceResult.verify,
+          promptpayRef: null,
+          serialNumber: serial,
+        });
+        setPaidSplits((splits) => splits.map((split, i) =>
+          i === index
+            ? {
+                ...split,
+                method: 'lightning',
+                amountSat,
+                btcRate: rate,
+                invoice: invoiceResult.pr,
+                verifyUrl: invoiceResult.verify,
+                qrRef: null,
+                serial,
+              }
+            : split
+        ));
+        setActivePendingIndex(index);
+        setCurrentSerial(serial);
+        setLnInvoice(invoiceResult.pr);
+        setLnVerifyUrl(invoiceResult.verify);
+        setLnAmountSat(amountSat);
+        setLnRate(rate);
+        setLnExpiry(parseInvoiceExpiry(invoiceResult.pr));
+        setLnExpired(false);
+        setLnLoading(false);
+        setLnError('');
+        setStep('lightning');
+      } catch (e: any) {
+        Alert.alert('ผิดพลาด', e?.message ?? 'ไม่สามารถเปลี่ยนวิธีชำระได้');
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      }
+    },
+    [paidSplits]
+  );
+
+  const promptSwitchPendingMethod = useCallback(
+    (index: number) => {
+      const target = paidSplits[index];
+      if (!target || target.status !== 'pending') return;
+
+      Alert.alert('เปลี่ยนวิธีชำระ', target.label, [
+        { text: 'เงินสด', onPress: () => switchPendingSplitMethod(index, 'cash') },
+        { text: 'PromptPay', onPress: () => switchPendingSplitMethod(index, 'promptpay') },
+        { text: 'Lightning', onPress: () => switchPendingSplitMethod(index, 'lightning') },
+        { text: 'ยกเลิก', style: 'cancel' },
+      ]);
+    },
+    [paidSplits, switchPendingSplitMethod]
+  );
+
   // Auto-confirm Lightning payment when verify URL reports settled
   useEffect(() => {
     if (lnAutoConfirmed && lnInvoice) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      if (splitMode !== 'none') {
+      if (activePendingIndex != null) {
+        confirmPendingSplit(activePendingIndex);
+      } else if (splitMode !== 'none') {
         recordSplitPayment('lightning', { amountSat: lnAmountSat, btcRate: lnRate });
       } else {
         completeOrder('lightning', { amountSat: lnAmountSat, btcRate: lnRate });
@@ -640,7 +899,7 @@ export default function CheckoutScreen() {
   }
 
   if (step === 'promptpay') {
-    const payAmount = splitMode !== 'none' ? getPayableAmount() : finalTotal;
+    const payAmount = activePendingSplit ? activePendingSplit.amount : splitMode !== 'none' ? getPayableAmount() : finalTotal;
     return (
       <SafeAreaView className="flex-1 bg-white items-center justify-center px-8">
         <Text className="text-xl font-bold text-mekha-text mb-2">PromptPay</Text>
@@ -660,7 +919,9 @@ export default function CheckoutScreen() {
         <Pressable
           className="w-full py-4 rounded-2xl items-center bg-purple-600"
           onPress={() => {
-            if (splitMode !== 'none') {
+            if (activePendingIndex != null) {
+              confirmPendingSplit(activePendingIndex);
+            } else if (splitMode !== 'none') {
               recordSplitPayment('promptpay');
             } else {
               completeOrder('promptpay');
@@ -670,24 +931,31 @@ export default function CheckoutScreen() {
           <Text className="text-white font-semibold">ยืนยันรับเงิน</Text>
         </Pressable>
 
-        <Pressable
-          className="mt-3 w-full py-4 rounded-2xl items-center bg-purple-50 border border-purple-200"
-          onPress={() => recordPendingPayment('promptpay')}
-        >
-          <Text className="text-purple-700 font-semibold">
-            พักไว้ / ไปคิดคนถัดไป
-          </Text>
-        </Pressable>
+        {activePendingIndex == null ? (
+          <Pressable
+            className="mt-3 w-full py-4 rounded-2xl items-center bg-purple-50 border border-purple-200"
+            onPress={() => recordPendingPayment('promptpay')}
+          >
+            <Text className="text-purple-700 font-semibold">
+              พักไว้ / ไปคิดคนถัดไป
+            </Text>
+          </Pressable>
+        ) : null}
 
-        <Pressable className="mt-3 items-center" onPress={() => setStep('summary')}>
-          <Text className="text-mekha-muted">ย้อนกลับโดยไม่บันทึก</Text>
+        <Pressable className="mt-3 items-center" onPress={() => {
+          setActivePendingIndex(null);
+          setStep('summary');
+        }}>
+          <Text className="text-mekha-muted">
+            {activePendingIndex == null ? 'ย้อนกลับโดยไม่บันทึก' : 'กลับไปสรุป'}
+          </Text>
         </Pressable>
       </SafeAreaView>
     );
   }
 
   if (step === 'lightning') {
-    const payAmount = splitMode !== 'none' ? getPayableAmount() : finalTotal;
+    const payAmount = activePendingSplit ? activePendingSplit.amount : splitMode !== 'none' ? getPayableAmount() : finalTotal;
     return (
       <SafeAreaView className="flex-1 bg-white items-center justify-center px-8">
         <Text className="text-xl font-bold text-mekha-text mb-2">Lightning</Text>
@@ -758,7 +1026,9 @@ export default function CheckoutScreen() {
             <Pressable
               className="w-full py-4 rounded-2xl items-center bg-purple-600"
               onPress={() => {
-                if (splitMode !== 'none') {
+                if (activePendingIndex != null) {
+                  confirmPendingSplit(activePendingIndex);
+                } else if (splitMode !== 'none') {
                   recordSplitPayment('lightning', { amountSat: lnAmountSat, btcRate: lnRate });
                 } else {
                   completeOrder('lightning', { amountSat: lnAmountSat, btcRate: lnRate });
@@ -767,19 +1037,26 @@ export default function CheckoutScreen() {
             >
               <Text className="text-white font-semibold">ยืนยันรับเงิน</Text>
             </Pressable>
-            <Pressable
-              className="mt-3 w-full py-4 rounded-2xl items-center bg-purple-50 border border-purple-200"
-              onPress={() => recordPendingPayment('lightning', { amountSat: lnAmountSat, btcRate: lnRate })}
-            >
-              <Text className="text-purple-700 font-semibold">
-                พักไว้ / ไปคิดคนถัดไป
-              </Text>
-            </Pressable>
+            {activePendingIndex == null ? (
+              <Pressable
+                className="mt-3 w-full py-4 rounded-2xl items-center bg-purple-50 border border-purple-200"
+                onPress={() => recordPendingPayment('lightning', { amountSat: lnAmountSat, btcRate: lnRate })}
+              >
+                <Text className="text-purple-700 font-semibold">
+                  พักไว้ / ไปคิดคนถัดไป
+                </Text>
+              </Pressable>
+            ) : null}
           </>
         ) : null}
 
-        <Pressable className="mt-3 items-center" onPress={() => setStep('summary')}>
-          <Text className="text-mekha-muted">ย้อนกลับโดยไม่บันทึก</Text>
+        <Pressable className="mt-3 items-center" onPress={() => {
+          setActivePendingIndex(null);
+          setStep('summary');
+        }}>
+          <Text className="text-mekha-muted">
+            {activePendingIndex == null ? 'ย้อนกลับโดยไม่บันทึก' : 'กลับไปสรุป'}
+          </Text>
         </Pressable>
       </SafeAreaView>
     );
@@ -787,6 +1064,54 @@ export default function CheckoutScreen() {
 
   // Summary & payment method selection
   const isLandscape = width > height;
+  const renderSplitHistory = (tone: 'blue' | 'orange') => (
+    <View className="mt-3">
+      {paidSplits.map((s, i) => (
+        <View key={`${s.transactionId ?? s.label}-${i}`} className={`py-2 border-t ${tone === 'blue' ? 'border-blue-100' : 'border-orange-100'}`}>
+          <View className="flex-row justify-between gap-2">
+            <Text className={`text-xs flex-1 ${tone === 'blue' ? 'text-blue-800' : 'text-orange-800'}`}>{s.label}</Text>
+            <Text className={`text-xs ${s.status === 'pending' ? 'text-amber-700' : 'text-green-700'}`}>
+              {s.status === 'pending' ? 'รอชำระ ' : ''}฿{s.amount.toFixed(2)}
+            </Text>
+          </View>
+          {s.status === 'pending' && (
+            <View className="flex-row flex-wrap gap-2 mt-2">
+              {s.method !== 'cash' && (
+                <Pressable
+                  className="px-3 py-1.5 rounded-lg bg-purple-50 border border-purple-200"
+                  onPress={() => openPendingSplit(i)}
+                >
+                  <Text className="text-xs font-medium text-purple-700">แสดง QR</Text>
+                </Pressable>
+              )}
+              <Pressable
+                className="px-3 py-1.5 rounded-lg bg-green-50 border border-green-200"
+                onPress={() => confirmPendingSplit(i)}
+              >
+                <Text className="text-xs font-medium text-green-700">ยืนยัน</Text>
+              </Pressable>
+              <Pressable
+                className="px-3 py-1.5 rounded-lg bg-white border border-mekha-border"
+                onPress={() => promptSwitchPendingMethod(i)}
+              >
+                <Text className="text-xs font-medium text-purple-700">เปลี่ยนวิธี</Text>
+              </Pressable>
+              <Pressable
+                className="px-3 py-1.5 rounded-lg bg-red-50 border border-red-200"
+                onPress={() => cancelPendingSplit(i)}
+              >
+                <Text className="text-xs font-medium text-red-700">ยกเลิก</Text>
+              </Pressable>
+            </View>
+          )}
+        </View>
+      ))}
+      <View className={`flex-row justify-between mt-2 pt-2 border-t ${tone === 'blue' ? 'border-blue-200' : 'border-orange-200'}`}>
+        <Text className={`text-sm font-semibold ${tone === 'blue' ? 'text-blue-900' : 'text-orange-900'}`}>คงเหลือ</Text>
+        <Text className="text-sm font-bold text-red-600">฿{remaining.toFixed(2)}</Text>
+      </View>
+    </View>
+  );
 
   const itemListContent = (
     <>
@@ -1061,20 +1386,7 @@ export default function CheckoutScreen() {
 
             {/* Paid splits history */}
             {paidSplits.length > 0 && (
-              <View className="mt-3">
-                {paidSplits.map((s, i) => (
-                  <View key={i} className="flex-row justify-between py-1">
-                    <Text className="text-xs text-blue-800">{s.label}</Text>
-                    <Text className={`text-xs ${s.status === 'pending' ? 'text-amber-700' : 'text-green-700'}`}>
-                      {s.status === 'pending' ? 'รอชำระ ' : ''}฿{s.amount.toFixed(2)}
-                    </Text>
-                  </View>
-                ))}
-                <View className="flex-row justify-between mt-2 pt-2 border-t border-blue-200">
-                  <Text className="text-sm font-semibold text-blue-900">คงเหลือ</Text>
-                  <Text className="text-sm font-bold text-red-600">฿{remaining.toFixed(2)}</Text>
-                </View>
-              </View>
+              renderSplitHistory('blue')
             )}
           </View>
         )}
@@ -1142,20 +1454,7 @@ export default function CheckoutScreen() {
 
             {/* Paid splits history */}
             {paidSplits.length > 0 && (
-              <View className="mt-3">
-                {paidSplits.map((s, i) => (
-                  <View key={i} className="flex-row justify-between py-1">
-                    <Text className="text-xs text-orange-800">{s.label}</Text>
-                    <Text className={`text-xs ${s.status === 'pending' ? 'text-amber-700' : 'text-green-700'}`}>
-                      {s.status === 'pending' ? 'รอชำระ ' : ''}฿{s.amount.toFixed(2)}
-                    </Text>
-                  </View>
-                ))}
-                <View className="flex-row justify-between mt-2 pt-2 border-t border-orange-200">
-                  <Text className="text-sm font-semibold text-orange-900">คงเหลือ</Text>
-                  <Text className="text-sm font-bold text-red-600">฿{remaining.toFixed(2)}</Text>
-                </View>
-              </View>
+              renderSplitHistory('orange')
             )}
           </View>
         )}
@@ -1212,7 +1511,7 @@ export default function CheckoutScreen() {
         {totalPending > 0 && remaining <= 0 && (
           <View className="mt-3 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
             <Text className="text-xs text-amber-700 text-center">
-              ยังมีรายการรอชำระ ต้องยืนยันจากหน้าประวัติธุรกรรมก่อนปิดบิล
+              ยังมีรายการรอชำระ กดยืนยันหรือเปลี่ยนวิธีจากรายการด้านบนก่อนปิดบิล
             </Text>
           </View>
         )}
