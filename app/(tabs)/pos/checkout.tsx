@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { View, Text, Pressable, ScrollView, ActivityIndicator, TextInput, Alert, useWindowDimensions } from 'react-native';
+import * as Clipboard from 'expo-clipboard';
 import { router } from 'expo-router';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -25,6 +26,19 @@ import type { PaymentMethod } from '../../../src/types';
 import QRCode from 'react-native-qrcode-svg';
 
 type CheckoutStep = 'summary' | 'payment' | 'cash' | 'promptpay' | 'lightning' | 'done';
+type SplitMode = 'none' | 'equal' | 'items';
+
+function formatCountdown(ms: number): string {
+  const totalSeconds = Math.max(0, Math.ceil(ms / 1000));
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+
+  if (hours > 0) {
+    return `${hours}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+  }
+  return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+}
 
 export default function CheckoutScreen() {
   const { items, getTotal, getSubtotal, discount, clear, updateQty, removeItem, setDiscount, tableId, tableName } = useCartStore();
@@ -51,11 +65,11 @@ export default function CheckoutScreen() {
   const [customDiscountValue, setCustomDiscountValue] = useState('');
   const [customDiscountType, setCustomDiscountType] = useState<'percent' | 'fixed'>('percent');
   const [customerCount, setCustomerCount] = useState(1);
-  const [splitMode, setSplitMode] = useState<'none' | 'equal' | 'items'>('none');
+  const [splitMode, setSplitMode] = useState<SplitMode>('none');
   const [showSplitOptions, setShowSplitOptions] = useState(false);
   const [selectedUnitIndices, setSelectedUnitIndices] = useState<Set<number>>(new Set());
   const [paidUnitIndices, setPaidUnitIndices] = useState<Set<number>>(new Set());
-  const [paidSplits, setPaidSplits] = useState<{ label: string; amount: number; method: PaymentMethod; amountSat: number | null; btcRate: number | null; invoice: string | null; qrRef: string | null }[]>([]);
+  const [paidSplits, setPaidSplits] = useState<{ label: string; amount: number; method: PaymentMethod; amountSat: number | null; btcRate: number | null; invoice: string | null; qrRef: string | null; serial: number | null }[]>([]);
 
   // Expiry countdown timer
   useEffect(() => {
@@ -70,9 +84,7 @@ export default function CheckoutScreen() {
             expiryTimerRef.current = null;
           }
         } else {
-          const mins = Math.floor(remaining / 60000);
-          const secs = Math.floor((remaining % 60000) / 1000);
-          setLnExpiryText(`หมดอายุใน ${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`);
+          setLnExpiryText(`หมดอายุใน ${formatCountdown(remaining)}`);
         }
       };
       updateExpiry();
@@ -121,23 +133,28 @@ export default function CheckoutScreen() {
 
   // Split bill calculations
   const splitPerPerson = customerCount > 1 ? finalTotal / customerCount : finalTotal;
+  const unitFinalMultiplier = subtotal > 0 ? finalTotal / subtotal : 1;
 
   // Expand items into individual units for split-by-items
   const expandedUnits = items.flatMap((item, itemIdx) =>
-    Array.from({ length: item.quantity }, (_, unitIdx) => ({
-      itemIdx,
-      unitIdx,
-      name: item.name,
-      unitPrice: item.unitPrice,
-      optionsDelta: item.selectedOptions.reduce((s, o) => s + (o.priceDelta ?? 0), 0),
-      unitTotal: item.unitPrice + item.selectedOptions.reduce((s, o) => s + (o.priceDelta ?? 0), 0),
-      options: item.selectedOptions,
-      note: item.note,
-    }))
+    Array.from({ length: item.quantity }, (_, unitIdx) => {
+      const unitTotal = item.unitPrice + item.selectedOptions.reduce((s, o) => s + (o.priceDelta ?? 0), 0);
+      return {
+        itemIdx,
+        unitIdx,
+        name: item.name,
+        unitPrice: item.unitPrice,
+        optionsDelta: item.selectedOptions.reduce((s, o) => s + (o.priceDelta ?? 0), 0),
+        unitTotal,
+        unitPayTotal: unitTotal * unitFinalMultiplier,
+        options: item.selectedOptions,
+        note: item.note,
+      };
+    })
   );
 
   const selectedItemsTotal = Array.from(selectedUnitIndices).reduce(
-    (sum, idx) => sum + (expandedUnits[idx]?.unitTotal ?? 0),
+    (sum, idx) => sum + (expandedUnits[idx]?.unitPayTotal ?? 0),
     0
   );
   const totalPaid = paidSplits.reduce((sum, s) => sum + s.amount, 0);
@@ -152,8 +169,42 @@ export default function CheckoutScreen() {
   const getPayableAmount = () => {
     if (splitMode === 'none') return finalTotal;
     if (splitMode === 'equal') return Math.min(splitPerPerson, remaining);
-    if (splitMode === 'items') return selectedItemsTotal;
+    if (splitMode === 'items') return Math.min(selectedItemsTotal, remaining);
     return finalTotal;
+  };
+
+  const getSplitAdjustmentShare = (amount: number) => {
+    const ratio = finalTotal > 0 ? amount / finalTotal : 0;
+    return {
+      discountAmount: discountAmount * ratio,
+      serviceChargeAmount: serviceChargeAmount * ratio,
+      vatAmount: vatAmount * ratio,
+    };
+  };
+
+  const applySplitMode = (mode: SplitMode) => {
+    setSplitMode(mode);
+    setSelectedUnitIndices(new Set());
+    setPaidUnitIndices(new Set());
+    setPaidSplits([]);
+    if (mode !== 'equal') setCustomerCount(1);
+    if (mode === 'equal') setCustomerCount(2);
+  };
+
+  const handleSplitModeChange = (mode: SplitMode) => {
+    if (mode === splitMode) return;
+    if (paidSplits.length > 0) {
+      Alert.alert(
+        'เปลี่ยนวิธีแบ่งจ่าย?',
+        'มีรายการที่จ่ายแล้วอยู่ ถ้าเปลี่ยนวิธีแบ่งจ่าย รายการจ่ายบางส่วนจะถูกล้าง',
+        [
+          { text: 'ยกเลิก', style: 'cancel' },
+          { text: 'เปลี่ยนและล้างรายการ', style: 'destructive', onPress: () => applySplitMode(mode) },
+        ]
+      );
+      return;
+    }
+    applySplitMode(mode);
   };
 
   const handlePayment = useCallback(
@@ -167,6 +218,7 @@ export default function CheckoutScreen() {
       await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
       if (method === 'cash') {
+        setCurrentSerial(null);
         setStep('cash');
       } else if (method === 'promptpay') {
         const promptpayId = await SecureStore.getItemAsync('mekha.promptpay_id');
@@ -241,7 +293,10 @@ export default function CheckoutScreen() {
           // Start polling verify URL if available
           if (invoiceResult.verify) {
             // Clean up any existing poll
-            pollCleanupRef.current?.();
+            const existingPollCleanup = pollCleanupRef.current as (() => void) | null;
+            if (typeof existingPollCleanup === 'function') {
+              existingPollCleanup();
+            }
             const cleanup = pollInvoice(
               () => checkVerifyUrl(invoiceResult.verify!),
               () => {
@@ -286,6 +341,7 @@ export default function CheckoutScreen() {
         btcRate: extra?.btcRate ?? null,
         invoice: method === 'lightning' ? lnInvoice : null,
         qrRef: method === 'promptpay' ? qrData : null,
+        serial: method === 'cash' ? null : currentSerial,
       }];
       setPaidSplits(newSplits);
 
@@ -304,7 +360,7 @@ export default function CheckoutScreen() {
         setStep('summary');
       }
     },
-    [splitMode, paidSplits, selectedUnitIndices, expandedUnits, paidUnitIndices, finalTotal, lnInvoice, qrData]
+    [splitMode, paidSplits, selectedUnitIndices, expandedUnits, paidUnitIndices, finalTotal, lnInvoice, qrData, currentSerial]
   );
 
   const completeOrder = useCallback(
@@ -345,6 +401,7 @@ export default function CheckoutScreen() {
       if (splits.length > 0) {
         // Split bill — create transaction per split
         for (const split of splits) {
+          const share = getSplitAdjustmentShare(split.amount);
           createTransaction({
             id: Crypto.randomUUID(),
             order_id: orderId,
@@ -352,11 +409,11 @@ export default function CheckoutScreen() {
             amount_thb: split.amount,
             amount_sat: split.amountSat,
             btc_rate_thb: split.btcRate,
-            discount_amount: 0,
-            service_charge_amount: 0,
-            vat_amount: 0,
+            discount_amount: share.discountAmount,
+            service_charge_amount: share.serviceChargeAmount,
+            vat_amount: share.vatAmount,
             vat_included: vatIncluded ? 1 : 0,
-            serial_number: currentSerial,
+            serial_number: split.serial,
             status: 'completed',
             lightning_invoice: split.invoice ?? (split.method === 'lightning' ? lnInvoice : null),
             lightning_preimage: null,
@@ -369,6 +426,7 @@ export default function CheckoutScreen() {
         const splitTotal = splits.reduce((sum, s) => sum + s.amount, 0);
         const leftover = finalTotal - splitTotal;
         if (leftover > 0.01) {
+          const share = getSplitAdjustmentShare(leftover);
           createTransaction({
             id: Crypto.randomUUID(),
             order_id: orderId,
@@ -376,11 +434,11 @@ export default function CheckoutScreen() {
             amount_thb: leftover,
             amount_sat: extra?.amountSat ?? null,
             btc_rate_thb: extra?.btcRate ?? null,
-            discount_amount: discountAmount,
-            service_charge_amount: serviceChargeAmount,
-            vat_amount: vatAmount,
+            discount_amount: share.discountAmount,
+            service_charge_amount: share.serviceChargeAmount,
+            vat_amount: share.vatAmount,
             vat_included: vatIncluded ? 1 : 0,
-            serial_number: currentSerial,
+            serial_number: method === 'cash' ? null : currentSerial,
             status: 'completed',
             lightning_invoice: method === 'lightning' ? lnInvoice : null,
             lightning_preimage: null,
@@ -402,7 +460,7 @@ export default function CheckoutScreen() {
           service_charge_amount: serviceChargeAmount,
           vat_amount: vatAmount,
           vat_included: vatIncluded ? 1 : 0,
-          serial_number: currentSerial,
+          serial_number: method === 'cash' ? null : currentSerial,
           status: 'completed',
           lightning_invoice: method === 'lightning' ? lnInvoice : null,
           lightning_preimage: null,
@@ -587,9 +645,16 @@ export default function CheckoutScreen() {
           </View>
         ) : lnInvoice && !lnLoading ? (
           <>
-            <View className="bg-white p-4 rounded-2xl border border-mekha-border mb-4">
+            <Pressable
+              className="bg-white p-4 rounded-2xl border border-mekha-border mb-4"
+              onPress={() => {
+                Clipboard.setStringAsync(lnInvoice);
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                Alert.alert('คัดลอกแล้ว', 'Invoice ถูกคัดลอกเรียบร้อย');
+              }}
+            >
               <QRCode value={lnInvoice} size={220} />
-            </View>
+            </Pressable>
             {lnExpiryText ? (
               <View className="bg-amber-50 rounded-xl px-4 py-2 mb-4">
                 <Text className="text-amber-700 text-sm font-medium text-center">{lnExpiryText}</Text>
@@ -856,12 +921,7 @@ export default function CheckoutScreen() {
                   : 'bg-purple-50 border-purple-200'
               }`}
               onPress={() => {
-                setSplitMode(mode);
-                setSelectedUnitIndices(new Set());
-                setPaidUnitIndices(new Set());
-                setPaidSplits([]);
-                if (mode !== 'equal') setCustomerCount(1);
-                if (mode === 'equal') setCustomerCount(2);
+                handleSplitModeChange(mode);
               }}
             >
               <Text
@@ -972,7 +1032,7 @@ export default function CheckoutScreen() {
                       )}
                     </View>
                   </View>
-                  <Text className="text-sm font-semibold text-mekha-text">฿{unit.unitTotal.toFixed(0)}</Text>
+                  <Text className="text-sm font-semibold text-mekha-text">฿{unit.unitPayTotal.toFixed(2)}</Text>
                 </Pressable>
               );
             })}

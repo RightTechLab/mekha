@@ -191,7 +191,7 @@ export default function MenuFormModal({ visible, menuId, onClose, onSaved }: Pro
 
   return (
     <Modal visible={visible} animationType="none" transparent>
-      <KeyboardAvoidingView className="flex-1 justify-end" behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <KeyboardAvoidingView className="flex-1 justify-end" behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <View className="flex-1 justify-end">
           <TouchableWithoutFeedback onPress={handleDismiss}>
             <Animated.View className="absolute inset-0 bg-black/50" style={overlayStyle} />
@@ -207,7 +207,12 @@ export default function MenuFormModal({ visible, menuId, onClose, onSaved }: Pro
               </Pressable>
             </View>
 
-            <ScrollView className="px-5 py-4" showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+            <ScrollView
+              className="px-5 py-4"
+              contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+            >
               <TextInput
                 className="bg-mekha-surface border border-mekha-border rounded-xl px-4 py-3 mb-3 text-mekha-text"
                 placeholder="ชื่อเมนู"

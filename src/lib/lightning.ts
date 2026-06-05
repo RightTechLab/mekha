@@ -208,8 +208,8 @@ export async function checkVerifyUrl(verifyUrl: string): Promise<'pending' | 'se
     if (!res.ok) return 'pending';
     const data = await res.json();
     // LNbits returns { settled: true/false }
-    // Some implementations return { paid: true/false } or { status: "OK" }
-    if (data.settled === true || data.paid === true || data.status === 'OK') {
+    // Some implementations return { paid: true/false }
+    if (data.settled === true || data.paid === true) {
       return 'settled';
     }
     return 'pending';

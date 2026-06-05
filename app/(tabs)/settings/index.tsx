@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState } from 'react';
 import { View, Text, Pressable, TextInput, ScrollView, Alert, Switch } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as SecureStore from 'expo-secure-store';
@@ -12,7 +12,7 @@ import { format, subDays } from 'date-fns';
 import { router } from 'expo-router';
 import { useSessionStore } from '../../../src/features/auth/sessionStore';
 import { getSetting, setSetting, getTransactions } from '../../../src/db/repositories/transactionRepo';
-import { getAllMenus, createMenu, getMenuById } from '../../../src/db/repositories/menuRepo';
+import { getAllMenus, createMenu, getMenuById, getAllCategories, createCategory } from '../../../src/db/repositories/menuRepo';
 import { getAllTables, createTable, deleteTable } from '../../../src/db/repositories/tableRepo';
 import { useLnurlCacheStore } from '../../../src/features/payment/lnurlCacheStore';
 import db from '../../../src/db/client';
@@ -33,9 +33,14 @@ export default function SettingsScreen() {
   const [lnAddress, setLnAddress] = useState('');
 
   // Track dirty state for save buttons
-  const initGeneral = useRef({ shopName: getSetting('shop_name') ?? 'Mekha', vatRate: getSetting('vat_rate') ?? '7', vatMode: (getSetting('vat_mode') ?? 'included') as string, serviceChargeRate: getSetting('service_charge_rate') ?? '0' });
+  const [initGeneral, setInitGeneral] = useState({
+    shopName: getSetting('shop_name') ?? 'Mekha',
+    vatRate: getSetting('vat_rate') ?? '7',
+    vatMode: (getSetting('vat_mode') ?? 'included') as string,
+    serviceChargeRate: getSetting('service_charge_rate') ?? '0',
+  });
   const [initPayment, setInitPayment] = useState({ promptpayId: '', lnAddress: '' });
-  const isGeneralDirty = shopName !== initGeneral.current.shopName || vatRate !== initGeneral.current.vatRate || vatMode !== initGeneral.current.vatMode || serviceChargeRate !== initGeneral.current.serviceChargeRate;
+  const isGeneralDirty = shopName !== initGeneral.shopName || vatRate !== initGeneral.vatRate || vatMode !== initGeneral.vatMode || serviceChargeRate !== initGeneral.serviceChargeRate;
   const isPaymentDirty = promptpayId !== initPayment.promptpayId || lnAddress !== initPayment.lnAddress;
   const [cashierPin, setCashierPin] = useState('');
   const [ownerPin, setOwnerPin] = useState('');
@@ -62,8 +67,9 @@ export default function SettingsScreen() {
     setSetting('vat_mode', vatMode);
     setSetting('vat_included', vatMode === 'included' ? '1' : '0');
     setSetting('service_charge_rate', serviceChargeRate);
-    initGeneral.current = { shopName: shopName.trim(), vatRate, vatMode, serviceChargeRate };
-    setShopName(shopName.trim());
+    const trimmedShopName = shopName.trim();
+    setInitGeneral({ shopName: trimmedShopName, vatRate, vatMode, serviceChargeRate });
+    setShopName(trimmedShopName);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
   };
 
@@ -163,6 +169,7 @@ export default function SettingsScreen() {
         text: 'เมนูอย่างเดียว',
         onPress: async () => {
           const menus = getAllMenus();
+          const categories = getAllCategories();
           const optionGroups: any[] = [];
           const optionItems: any[] = [];
           for (const menu of menus) {
@@ -173,7 +180,7 @@ export default function SettingsScreen() {
               optionItems.push(...items);
             }
           }
-          const data = JSON.stringify({ menus, option_groups: optionGroups, option_items: optionItems, exported_at: new Date().toISOString() }, null, 2);
+          const data = JSON.stringify({ menus, categories, option_groups: optionGroups, option_items: optionItems, exported_at: new Date().toISOString() }, null, 2);
           const file = new File(Paths.document, 'mekha-menu-export.json');
           if (!file.exists) file.create();
           file.write(data);
@@ -184,6 +191,7 @@ export default function SettingsScreen() {
         text: 'เมนูและโต๊ะ',
         onPress: async () => {
           const menus = getAllMenus();
+          const categories = getAllCategories();
           const optionGroups: any[] = [];
           const optionItems: any[] = [];
           for (const menu of menus) {
@@ -195,7 +203,7 @@ export default function SettingsScreen() {
             }
           }
           const tablesData = getAllTables();
-          const data = JSON.stringify({ menus, option_groups: optionGroups, option_items: optionItems, tables: tablesData, exported_at: new Date().toISOString() }, null, 2);
+          const data = JSON.stringify({ menus, categories, option_groups: optionGroups, option_items: optionItems, tables: tablesData, exported_at: new Date().toISOString() }, null, 2);
           const file = new File(Paths.document, 'mekha-menu-tables-export.json');
           if (!file.exists) file.create();
           file.write(data);
@@ -209,10 +217,66 @@ export default function SettingsScreen() {
   const handleBackup = async () => {
     const dbPath = `${FileSystem.documentDirectory}SQLite/mekha.db`;
     const backupPath = `${FileSystem.documentDirectory}mekha-backup-${Date.now()}.db`;
+    db.execSync('PRAGMA wal_checkpoint(FULL);');
     await FileSystem.copyAsync({ from: dbPath, to: backupPath });
     await Sharing.shareAsync(backupPath);
     setSetting('last_backup_at', new Date().toISOString());
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+  };
+
+  const handleImportBackup = async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: ['application/x-sqlite3', 'application/octet-stream', '*/*'],
+        copyToCacheDirectory: true,
+      });
+      if (result.canceled) return;
+
+      const picked = result.assets[0];
+      const filename = picked.name?.toLowerCase() ?? '';
+      if (filename && !filename.endsWith('.db')) {
+        Alert.alert('ไฟล์ไม่ถูกต้อง', 'กรุณาเลือกไฟล์สำรองนามสกุล .db');
+        return;
+      }
+
+      Alert.alert(
+        'นำเข้าข้อมูลสำรอง',
+        'การนำเข้าไฟล์ .db จะทับข้อมูลทั้งหมดในเครื่องนี้ ควรสำรองข้อมูลปัจจุบันก่อนดำเนินการ',
+        [
+          { text: 'ยกเลิก', style: 'cancel' },
+          {
+            text: 'นำเข้าและทับข้อมูล',
+            style: 'destructive',
+            onPress: async () => {
+              try {
+                const sqliteDir = `${FileSystem.documentDirectory}SQLite`;
+                const dbPath = `${sqliteDir}/mekha.db`;
+                await FileSystem.makeDirectoryAsync(sqliteDir, { intermediates: true });
+
+                db.execSync('PRAGMA wal_checkpoint(FULL);');
+                db.closeSync();
+
+                await FileSystem.deleteAsync(`${dbPath}-wal`, { idempotent: true });
+                await FileSystem.deleteAsync(`${dbPath}-shm`, { idempotent: true });
+                await FileSystem.copyAsync({ from: picked.uri, to: dbPath });
+
+                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                Alert.alert(
+                  'นำเข้าสำเร็จ',
+                  'กรุณาปิดแอปแล้วเปิดใหม่ เพื่อโหลดฐานข้อมูลที่นำเข้า'
+                );
+              } catch (e: any) {
+                Alert.alert('ผิดพลาด', e?.message ?? 'ไม่สามารถนำเข้าข้อมูลสำรองได้');
+                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+              }
+            },
+          },
+        ]
+      );
+    } catch (e: any) {
+      Alert.alert('ผิดพลาด', e?.message ?? 'ไม่สามารถเลือกไฟล์สำรองได้');
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+    }
   };
 
   const handleImportMenu = async () => {
@@ -236,6 +300,26 @@ export default function SettingsScreen() {
       let importedGroups = 0;
       let importedItems = 0;
       let importedTables = 0;
+      let importedCategories = 0;
+
+      if (Array.isArray(data.categories)) {
+        for (const category of data.categories) {
+          const name = category.name?.trim();
+          if (!name) continue;
+          const existing = db.getFirstSync<any>(
+            'SELECT id FROM categories WHERE id = ? OR lower(name) = lower(?)',
+            [category.id, name]
+          );
+          if (existing) continue;
+          createCategory({
+            id: category.id ?? Crypto.randomUUID(),
+            name,
+            color: category.color ?? null,
+            sort_order: category.sort_order ?? importedCategories,
+          });
+          importedCategories++;
+        }
+      }
 
       for (const menu of data.menus) {
         if (getMenuById(menu.id)) {
@@ -301,6 +385,7 @@ export default function SettingsScreen() {
 
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       let msg = `นำเข้า ${importedMenus} เมนู (ข้าม ${skippedMenus} รายการที่มีอยู่แล้ว)`;
+      if (importedCategories > 0) msg += `\nหมวดหมู่ ${importedCategories} รายการ`;
       if (importedGroups > 0) msg += `\nตัวเลือก ${importedGroups} กลุ่ม, ${importedItems} รายการ`;
       if (importedTables > 0) msg += `\nโต๊ะ ${importedTables} รายการ`;
       Alert.alert('สำเร็จ', msg);
@@ -394,10 +479,10 @@ export default function SettingsScreen() {
             onPress={() => setVatMode('included')}
           >
             <Text className={`text-sm font-medium ${vatMode === 'included' ? 'text-white' : 'text-mekha-text'}`}>
-              รวมใน VAT
+              ราคารวม VAT แล้ว
             </Text>
             <Text className={`text-xs mt-0.5 ${vatMode === 'included' ? 'text-purple-200' : 'text-mekha-muted'}`}>
-              ราคารวม VAT แล้ว
+              ไม่ต้องบวกเพิ่ม
             </Text>
           </Pressable>
           <Pressable
@@ -407,7 +492,7 @@ export default function SettingsScreen() {
             onPress={() => setVatMode('excluded')}
           >
             <Text className={`text-sm font-medium ${vatMode === 'excluded' ? 'text-white' : 'text-mekha-text'}`}>
-              แยก VAT
+              ราคายังไม่รวม VAT
             </Text>
             <Text className={`text-xs mt-0.5 ${vatMode === 'excluded' ? 'text-purple-200' : 'text-mekha-muted'}`}>
               บวก VAT เพิ่ม
@@ -611,6 +696,12 @@ export default function SettingsScreen() {
           onPress={handleBackup}
         >
           <Text className="text-mekha-text font-medium">สำรองข้อมูล</Text>
+        </Pressable>
+        <Pressable
+          className="bg-amber-50 border border-amber-200 py-3 rounded-xl items-center mb-6"
+          onPress={handleImportBackup}
+        >
+          <Text className="text-amber-700 font-medium">นำเข้าข้อมูลสำรอง (.db)</Text>
         </Pressable>
         <Pressable
           className="bg-red-50 border border-red-200 py-3 rounded-xl items-center mb-6"

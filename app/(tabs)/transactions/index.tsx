@@ -1,15 +1,18 @@
 import { useState, useCallback, useEffect } from 'react';
-import { View, Text, Pressable, ScrollView, Modal, TouchableWithoutFeedback } from 'react-native';
+import { View, Text, Pressable, ScrollView, Modal, TouchableWithoutFeedback, Alert } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { FlashList } from '@shopify/flash-list';
 import { format, subDays } from 'date-fns';
 import * as SecureStore from 'expo-secure-store';
+import * as Clipboard from 'expo-clipboard';
+import * as Haptics from 'expo-haptics';
 import QRCode from 'react-native-qrcode-svg';
 import { getTransactions, getTransactionsByOrderId } from '../../../src/db/repositories/transactionRepo';
 import { getOrderItems } from '../../../src/db/repositories/orderRepo';
 import { useSessionStore } from '../../../src/features/auth/sessionStore';
 import { generatePromptPayQR } from '../../../src/lib/promptpay';
+import { parseInvoiceExpiry } from '../../../src/lib/lightning';
 import type { Transaction, OrderItem } from '../../../src/types';
 
 const METHOD_LABELS: Record<string, string> = {
@@ -45,6 +48,18 @@ const PAYMENT_FILTERS: { label: string; value: string | null }[] = [
   { label: 'PromptPay', value: 'promptpay' },
   { label: 'Lightning', value: 'lightning' },
 ];
+
+function formatCountdown(ms: number): string {
+  const totalSeconds = Math.max(0, Math.ceil(ms / 1000));
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+
+  if (hours > 0) {
+    return `${hours}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+  }
+  return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+}
 
 export default function TransactionsScreen() {
   const insets = useSafeAreaInsets();
@@ -163,6 +178,8 @@ function TransactionCard({ txn }: { txn: Transaction }) {
   const [splitTxns, setSplitTxns] = useState<Transaction[]>([]);
   const [showQr, setShowQr] = useState(false);
   const [qrData, setQrData] = useState('');
+  const [qrTxn, setQrTxn] = useState<Transaction>(txn);
+  const [qrNow, setQrNow] = useState(Date.now());
 
   // Load split info immediately on mount/recycle
   useEffect(() => {
@@ -171,6 +188,14 @@ function TransactionCard({ txn }: { txn: Transaction }) {
     const related = getTransactionsByOrderId(txn.order_id);
     setSplitTxns(related.length > 1 ? related : []);
   }, [txn.id, txn.order_id]);
+
+  useEffect(() => {
+    if (!showQr || qrTxn.payment_method !== 'lightning' || !qrTxn.lightning_invoice) return;
+
+    setQrNow(Date.now());
+    const timer = setInterval(() => setQrNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, [showQr, qrTxn.id, qrTxn.payment_method, qrTxn.lightning_invoice]);
 
   const toggleExpand = useCallback(() => {
     if (!expanded) {
@@ -193,6 +218,14 @@ function TransactionCard({ txn }: { txn: Transaction }) {
   const displayMethod = isMultiMethod
     ? 'หลายรูปแบบ'
     : (METHOD_LABELS[uniqueMethods[0]] ?? uniqueMethods[0]);
+  const formatPaymentId = (t: Transaction) =>
+    t.serial_number != null ? `#${String(t.serial_number).padStart(4, '0')}` : t.id.slice(0, 8);
+  const handleCopyInvoice = async () => {
+    if (qrTxn.payment_method !== 'lightning' || !qrData) return;
+    await Clipboard.setStringAsync(qrData);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    Alert.alert('คัดลอกแล้ว', 'Invoice ถูกคัดลอกเรียบร้อย');
+  };
 
   return (
     <Pressable
@@ -204,7 +237,7 @@ function TransactionCard({ txn }: { txn: Transaction }) {
           <Text className="text-sm font-medium text-mekha-text">
             {displayMethod}
           </Text>
-          {txn.serial_number && (
+          {txn.serial_number && txn.payment_method !== 'cash' && !isSplitGroup && (
             <View className="bg-mekha-surface px-2 py-0.5 rounded-full border border-mekha-border">
               <Text className="text-xs text-mekha-muted font-medium">#{String(txn.serial_number).padStart(4, '0')}</Text>
             </View>
@@ -241,6 +274,7 @@ function TransactionCard({ txn }: { txn: Transaction }) {
             <View key={st.id} className="flex-row justify-between py-1">
               <Text className="text-xs text-mekha-text">
                 {METHOD_LABELS[st.payment_method] ?? st.payment_method}
+                {st.serial_number && st.payment_method !== 'cash' ? ` #${String(st.serial_number).padStart(4, '0')}` : ''}
               </Text>
               <Text className="text-xs font-medium text-mekha-text">
                 ฿{st.amount_thb.toFixed(2)}
@@ -275,6 +309,7 @@ function TransactionCard({ txn }: { txn: Transaction }) {
           className="mt-3 bg-purple-50 py-2 rounded-xl items-center"
           onPress={async (e) => {
             e.stopPropagation?.();
+            setQrTxn(txn);
             if (txn.payment_method === 'promptpay') {
               if (txn.promptpay_ref) {
                 setQrData(txn.promptpay_ref);
@@ -292,7 +327,9 @@ function TransactionCard({ txn }: { txn: Transaction }) {
             }
           }}
         >
-          <Text className="text-sm font-medium text-purple-700">แสดง QR อีกครั้ง</Text>
+          <Text className="text-sm font-medium text-purple-700">
+            แสดง QR {formatPaymentId(txn)} อีกครั้ง
+          </Text>
         </Pressable>
       )}
       {expanded && isSplitGroup && splitTxns.filter((st) => st.payment_method === 'promptpay' || st.payment_method === 'lightning').length > 0 && (
@@ -303,6 +340,7 @@ function TransactionCard({ txn }: { txn: Transaction }) {
               className="bg-purple-50 py-2 rounded-xl items-center mb-1"
               onPress={async (e) => {
                 e.stopPropagation?.();
+                setQrTxn(st);
                 if (st.payment_method === 'promptpay') {
                   if (st.promptpay_ref) {
                     setQrData(st.promptpay_ref);
@@ -321,7 +359,7 @@ function TransactionCard({ txn }: { txn: Transaction }) {
               }}
             >
               <Text className="text-sm font-medium text-purple-700">
-                QR {METHOD_LABELS[st.payment_method]} ฿{st.amount_thb.toFixed(2)}
+                {formatPaymentId(st)} QR {METHOD_LABELS[st.payment_method]} ฿{st.amount_thb.toFixed(2)}
               </Text>
             </Pressable>
           ))}
@@ -334,19 +372,45 @@ function TransactionCard({ txn }: { txn: Transaction }) {
               <TouchableWithoutFeedback>
                 <View className="bg-white rounded-2xl p-6 mx-6 items-center">
                   <Text className="text-lg font-bold text-mekha-text mb-2">
-                    {txn.payment_method === 'promptpay' ? 'PromptPay QR' : 'Lightning Invoice'}
+                    {qrTxn.payment_method === 'promptpay' ? 'PromptPay QR' : 'Lightning Invoice'}
                   </Text>
-                  <Text className="text-purple-600 font-semibold mb-4">฿{txn.amount_thb.toFixed(2)}</Text>
-                  {txn.payment_method === 'lightning' && (
-                    <View className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-2 mb-4">
-                      <Text className="text-xs text-amber-700 text-center">
-                        Invoice นี้อาจหมดอายุแล้ว ตรวจสอบก่อนให้ลูกค้าสแกน
-                      </Text>
-                    </View>
+                  {qrTxn.serial_number != null && (
+                    <Text className="text-sm text-mekha-muted mb-1">#{String(qrTxn.serial_number).padStart(4, '0')}</Text>
                   )}
-                  <View className="bg-white p-3 rounded-xl border border-mekha-border">
+                  <Text className="text-purple-600 font-semibold mb-4">฿{qrTxn.amount_thb.toFixed(2)}</Text>
+                  {qrTxn.payment_method === 'lightning' && qrTxn.lightning_invoice && (() => {
+                    if (qrTxn.status === 'completed') {
+                      return (
+                        <View className="bg-green-50 border border-green-200 rounded-xl px-4 py-2 mb-4">
+                          <Text className="text-xs text-green-700 text-center font-medium">
+                            จ่ายแล้ว
+                          </Text>
+                        </View>
+                      );
+                    }
+                    const expiryMs = parseInvoiceExpiry(qrTxn.lightning_invoice!);
+                    const remainingMs = expiryMs ? expiryMs - qrNow : 0;
+                    const isExpired = remainingMs <= 0;
+                    return isExpired ? (
+                      <View className="bg-red-50 border border-red-200 rounded-xl px-4 py-2 mb-4">
+                        <Text className="text-xs text-red-700 text-center font-medium">
+                          Invoice หมดอายุแล้ว
+                        </Text>
+                      </View>
+                    ) : (
+                      <View className="bg-green-50 border border-green-200 rounded-xl px-4 py-2 mb-4">
+                        <Text className="text-xs text-green-700 text-center font-medium">
+                          หมดอายุใน {formatCountdown(remainingMs)}
+                        </Text>
+                      </View>
+                    );
+                  })()}
+                  <Pressable className="bg-white p-3 rounded-xl border border-mekha-border" onPress={handleCopyInvoice}>
                     <QRCode value={qrData} size={200} />
-                  </View>
+                  </Pressable>
+                  {qrTxn.payment_method === 'lightning' && (
+                    <Text className="text-xs text-mekha-muted mt-2">แตะ QR เพื่อคัดลอก invoice</Text>
+                  )}
                   <Pressable className="mt-4 py-2 px-6 rounded-xl bg-purple-600" onPress={() => setShowQr(false)}>
                     <Text className="text-white font-semibold">ปิด</Text>
                   </Pressable>

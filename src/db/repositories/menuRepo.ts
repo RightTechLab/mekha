@@ -12,6 +12,7 @@ export function getMenuById(id: string): Menu | null {
 }
 
 export function createMenu(menu: Omit<Menu, 'created_at'>): void {
+  ensureCategory(menu.category);
   db.runSync(
     `INSERT INTO menus (id, name, price, category, image_path, is_active, sort_order)
      VALUES (?, ?, ?, ?, ?, ?, ?)`,
@@ -31,6 +32,10 @@ export function updateMenu(
   id: string,
   data: Partial<Omit<Menu, 'id' | 'created_at'>>
 ): void {
+  if (data.category !== undefined) {
+    ensureCategory(data.category);
+  }
+
   const fields: string[] = [];
   const values: (string | number | null)[] = [];
 
@@ -71,7 +76,7 @@ export function deleteMenu(id: string): void {
 
 export function getMenuCategories(): string[] {
   const rows = db.getAllSync<{ category: string }>(
-    'SELECT DISTINCT category FROM menus WHERE category IS NOT NULL AND is_active = 1 ORDER BY category'
+    "SELECT DISTINCT TRIM(category) as category FROM menus WHERE category IS NOT NULL AND TRIM(category) != '' AND is_active = 1 ORDER BY category"
   );
   return rows.map((r) => r.category);
 }
@@ -126,16 +131,59 @@ export interface CategoryItem {
 }
 
 export function getAllCategories(): CategoryItem[] {
+  syncMenuCategoriesToCategories();
   return db.getAllSync<CategoryItem>(
     'SELECT * FROM categories ORDER BY sort_order, name'
   );
 }
 
 export function createCategory(cat: Omit<CategoryItem, 'created_at'>): void {
+  const existing = db.getFirstSync<{ id: string }>(
+    'SELECT id FROM categories WHERE lower(name) = lower(?)',
+    [cat.name.trim()]
+  );
+  if (existing || !cat.name.trim()) return;
+
   db.runSync(
     `INSERT INTO categories (id, name, color, sort_order) VALUES (?, ?, ?, ?)`,
-    [cat.id, cat.name, cat.color, cat.sort_order]
+    [cat.id, cat.name.trim(), cat.color, cat.sort_order]
   );
+}
+
+export function ensureCategory(name: string | null | undefined): void {
+  const normalized = name?.trim();
+  if (!normalized) return;
+
+  const existing = db.getFirstSync<{ id: string }>(
+    'SELECT id FROM categories WHERE lower(name) = lower(?)',
+    [normalized]
+  );
+  if (existing) return;
+
+  const maxSort = db.getFirstSync<{ max_sort: number | null }>(
+    'SELECT MAX(sort_order) as max_sort FROM categories'
+  );
+  db.runSync(
+    `INSERT INTO categories (id, name, color, sort_order)
+     VALUES (lower(hex(randomblob(16))), ?, NULL, ?)`,
+    [normalized, (maxSort?.max_sort ?? -1) + 1]
+  );
+}
+
+export function syncMenuCategoriesToCategories(): number {
+  const menuCategories = getMenuCategories();
+  const existingCategories = db.getAllSync<{ name: string }>('SELECT name FROM categories');
+  const existingNames = new Set(existingCategories.map((c) => c.name.trim().toLowerCase()));
+  let added = 0;
+
+  for (const category of menuCategories) {
+    if (existingNames.has(category.toLowerCase())) continue;
+    ensureCategory(category);
+    existingNames.add(category.toLowerCase());
+    added += 1;
+  }
+
+  return added;
 }
 
 export function updateCategory(id: string, data: { name?: string; color?: string | null; sort_order?: number }): void {

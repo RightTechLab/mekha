@@ -89,12 +89,12 @@ export default function CategoryFormModal({ visible, onClose, onSaved }: Props) 
 
   return (
     <Modal visible={visible} animationType="none" transparent>
-      <KeyboardAvoidingView className="flex-1 justify-end" behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <KeyboardAvoidingView className="flex-1 justify-end" behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <View className="flex-1 justify-end">
           <TouchableWithoutFeedback onPress={handleDismiss}>
             <Animated.View className="absolute inset-0 bg-black/50" style={overlayStyle} />
           </TouchableWithoutFeedback>
-          <Animated.View className="bg-white rounded-t-3xl max-h-[70%]" style={sheetStyle}>
+          <Animated.View className="bg-white rounded-t-3xl max-h-[90%]" style={sheetStyle}>
             {/* Header */}
             <View className="px-5 pt-5 pb-3 border-b border-mekha-border flex-row items-center justify-between">
               <Text className="text-xl font-bold text-mekha-text">จัดการหมวดหมู่</Text>
@@ -103,7 +103,12 @@ export default function CategoryFormModal({ visible, onClose, onSaved }: Props) 
               </Pressable>
             </View>
 
-            <ScrollView className="px-5 py-4" showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+            <ScrollView
+              className="px-5 py-4"
+              contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+            >
               {/* Add new category */}
               <Text className="text-sm text-mekha-muted mb-1.5">เพิ่มหมวดหมู่ใหม่</Text>
               <View className="flex-row gap-2 mb-4">
