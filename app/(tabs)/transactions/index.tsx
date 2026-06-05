@@ -8,11 +8,11 @@ import * as SecureStore from 'expo-secure-store';
 import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
 import QRCode from 'react-native-qrcode-svg';
-import { getTransactions, getTransactionsByOrderId } from '../../../src/db/repositories/transactionRepo';
-import { getOrderItems } from '../../../src/db/repositories/orderRepo';
+import { cancelTransaction, completeTransaction, getTransactions, getTransactionsByOrderId, updateTransactionStatus } from '../../../src/db/repositories/transactionRepo';
+import { getOrderItems, updateOrderStatus } from '../../../src/db/repositories/orderRepo';
 import { useSessionStore } from '../../../src/features/auth/sessionStore';
 import { generatePromptPayQR } from '../../../src/lib/promptpay';
-import { parseInvoiceExpiry } from '../../../src/lib/lightning';
+import { checkVerifyUrl, parseInvoiceExpiry } from '../../../src/lib/lightning';
 import type { Transaction, OrderItem } from '../../../src/types';
 
 const METHOD_LABELS: Record<string, string> = {
@@ -22,13 +22,17 @@ const METHOD_LABELS: Record<string, string> = {
 };
 
 const STATUS_COLORS: Record<string, string> = {
+  pending: 'bg-amber-50 text-amber-700',
   completed: 'bg-green-50 text-green-700',
+  expired: 'bg-red-50 text-red-700',
+  cancelled: 'bg-gray-100 text-gray-600',
   voided: 'bg-red-50 text-red-700',
   refunded: 'bg-yellow-50 text-yellow-700',
 };
 
 const STATUS_LABELS: Record<string, string> = {
   completed: 'ชำระแล้ว',
+  cancelled: 'ยกเลิก',
   voided: 'ยกเลิก',
   refunded: 'คืนเงิน',
   pending: 'รอชำระ',
@@ -165,14 +169,14 @@ export default function TransactionsScreen() {
         <FlashList
           data={transactions}
           contentContainerStyle={{ padding: 16, paddingBottom: insets.bottom + 80 }}
-          renderItem={({ item }) => <TransactionCard txn={item} />}
+          renderItem={({ item }) => <TransactionCard txn={item} onChanged={loadData} />}
         />
       )}
     </SafeAreaView>
   );
 }
 
-function TransactionCard({ txn }: { txn: Transaction }) {
+function TransactionCard({ txn, onChanged }: { txn: Transaction; onChanged: () => void }) {
   const [expanded, setExpanded] = useState(false);
   const [items, setItems] = useState<OrderItem[]>([]);
   const [splitTxns, setSplitTxns] = useState<Transaction[]>([]);
@@ -220,6 +224,62 @@ function TransactionCard({ txn }: { txn: Transaction }) {
     : (METHOD_LABELS[uniqueMethods[0]] ?? uniqueMethods[0]);
   const formatPaymentId = (t: Transaction) =>
     t.serial_number != null ? `#${String(t.serial_number).padStart(4, '0')}` : t.id.slice(0, 8);
+  const refreshRelated = () => {
+    const related = getTransactionsByOrderId(txn.order_id);
+    setSplitTxns(related.length > 1 ? related : []);
+    onChanged();
+  };
+  const settleOrderIfAllCompleted = () => {
+    const related = getTransactionsByOrderId(txn.order_id);
+    const active = related.filter((t) => !['cancelled', 'voided', 'refunded', 'expired'].includes(t.status));
+    if (active.length > 0 && active.every((t) => t.status === 'completed')) {
+      updateOrderStatus(txn.order_id, 'paid');
+    }
+  };
+  const handleConfirmPending = (target: Transaction) => {
+    completeTransaction(target.id);
+    settleOrderIfAllCompleted();
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    refreshRelated();
+  };
+  const handleCancelPending = (target: Transaction) => {
+    Alert.alert('ยกเลิกรายการรอชำระ', `ต้องการยกเลิก ${formatPaymentId(target)} หรือไม่?`, [
+      { text: 'ไม่ยกเลิก', style: 'cancel' },
+      {
+        text: 'ยกเลิกรายการ',
+        style: 'destructive',
+        onPress: () => {
+          cancelTransaction(target.id, 'cancelled from transaction history');
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+          refreshRelated();
+        },
+      },
+    ]);
+  };
+  const handleCheckLightning = async (target: Transaction) => {
+    if (!target.lightning_verify_url) {
+      Alert.alert('ตรวจสอบไม่ได้', 'รายการนี้ไม่มี verify URL');
+      return;
+    }
+    const status = await checkVerifyUrl(target.lightning_verify_url);
+    if (status === 'settled') {
+      completeTransaction(target.id);
+      settleOrderIfAllCompleted();
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      Alert.alert('จ่ายแล้ว', 'ตรวจพบการชำระเงิน Lightning แล้ว');
+      refreshRelated();
+      return;
+    }
+    const expiryMs = target.lightning_invoice ? parseInvoiceExpiry(target.lightning_invoice) : null;
+    if (expiryMs && Date.now() > expiryMs) {
+      updateTransactionStatus(target.id, 'expired');
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      Alert.alert('หมดอายุแล้ว', 'Invoice นี้หมดอายุแล้ว');
+      refreshRelated();
+      return;
+    }
+    Alert.alert('ยังไม่พบการชำระ', 'ยังตรวจไม่พบการจ่าย Lightning รายการนี้');
+  };
   const handleCopyInvoice = async () => {
     if (qrTxn.payment_method !== 'lightning' || !qrData) return;
     await Clipboard.setStringAsync(qrData);
@@ -304,7 +364,7 @@ function TransactionCard({ txn }: { txn: Transaction }) {
       {expanded && items.length === 0 && (
         <Text className="text-xs text-mekha-muted mt-2 italic">ไม่มีรายละเอียด</Text>
       )}
-      {expanded && txn.status === 'completed' && !isSplitGroup && (txn.payment_method === 'promptpay' || txn.payment_method === 'lightning') && (
+      {expanded && (txn.status === 'completed' || txn.status === 'pending') && !isSplitGroup && (txn.payment_method === 'promptpay' || txn.payment_method === 'lightning') && (
         <Pressable
           className="mt-3 bg-purple-50 py-2 rounded-xl items-center"
           onPress={async (e) => {
@@ -331,6 +391,14 @@ function TransactionCard({ txn }: { txn: Transaction }) {
             แสดง QR {formatPaymentId(txn)} อีกครั้ง
           </Text>
         </Pressable>
+      )}
+      {expanded && txn.status === 'pending' && !isSplitGroup && (
+        <PendingActions
+          txn={txn}
+          onConfirm={handleConfirmPending}
+          onCancel={handleCancelPending}
+          onCheckLightning={handleCheckLightning}
+        />
       )}
       {expanded && isSplitGroup && splitTxns.filter((st) => st.payment_method === 'promptpay' || st.payment_method === 'lightning').length > 0 && (
         <View className="mt-3">
@@ -362,6 +430,19 @@ function TransactionCard({ txn }: { txn: Transaction }) {
                 {formatPaymentId(st)} QR {METHOD_LABELS[st.payment_method]} ฿{st.amount_thb.toFixed(2)}
               </Text>
             </Pressable>
+          ))}
+        </View>
+      )}
+      {expanded && isSplitGroup && splitTxns.some((st) => st.status === 'pending') && (
+        <View className="mt-2">
+          {splitTxns.filter((st) => st.status === 'pending').map((st) => (
+            <PendingActions
+              key={`pending-${st.id}`}
+              txn={st}
+              onConfirm={handleConfirmPending}
+              onCancel={handleCancelPending}
+              onCheckLightning={handleCheckLightning}
+            />
           ))}
         </View>
       )}
@@ -421,5 +502,51 @@ function TransactionCard({ txn }: { txn: Transaction }) {
         </Modal>
       )}
     </Pressable>
+  );
+}
+
+function PendingActions({
+  txn,
+  onConfirm,
+  onCancel,
+  onCheckLightning,
+}: {
+  txn: Transaction;
+  onConfirm: (txn: Transaction) => void;
+  onCancel: (txn: Transaction) => void;
+  onCheckLightning: (txn: Transaction) => void;
+}) {
+  return (
+    <View className="mt-2 gap-2">
+      {txn.payment_method === 'lightning' && (
+        <Pressable
+          className="bg-amber-50 border border-amber-200 py-2 rounded-xl items-center"
+          onPress={(e) => {
+            e.stopPropagation?.();
+            onCheckLightning(txn);
+          }}
+        >
+          <Text className="text-sm font-medium text-amber-700">ตรวจสอบ Lightning</Text>
+        </Pressable>
+      )}
+      <Pressable
+        className="bg-green-50 border border-green-200 py-2 rounded-xl items-center"
+        onPress={(e) => {
+          e.stopPropagation?.();
+          onConfirm(txn);
+        }}
+      >
+        <Text className="text-sm font-medium text-green-700">ยืนยันรับเงิน</Text>
+      </Pressable>
+      <Pressable
+        className="bg-red-50 border border-red-200 py-2 rounded-xl items-center"
+        onPress={(e) => {
+          e.stopPropagation?.();
+          onCancel(txn);
+        }}
+      >
+        <Text className="text-sm font-medium text-red-700">ยกเลิกรายการรอชำระ</Text>
+      </Pressable>
+    </View>
   );
 }
