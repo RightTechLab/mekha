@@ -407,8 +407,10 @@ export default function CheckoutScreen() {
 
       markSelectedUnitsAllocated();
 
-      const newTotalPaid = newSplits.reduce((sum, s) => sum + s.amount, 0);
-      if (newTotalPaid >= finalTotal - 0.01) {
+      const newTotalCompleted = newSplits
+        .filter((s) => s.status === 'completed')
+        .reduce((sum, s) => sum + s.amount, 0);
+      if (newTotalCompleted >= finalTotal - 0.01) {
         completeOrder(method, undefined, newSplits);
       } else {
         setStep('summary');
@@ -465,8 +467,7 @@ export default function CheckoutScreen() {
 
       const newAllocated = newSplits.reduce((sum, s) => sum + s.amount, 0);
       if (newAllocated >= finalTotal - 0.01) {
-        clear();
-        router.back();
+        setStep('summary');
       } else {
         setStep('summary');
       }
@@ -564,8 +565,12 @@ export default function CheckoutScreen() {
       }
 
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      clear();
-      router.back();
+      if (hasPending) {
+        setStep('summary');
+      } else {
+        clear();
+        router.back();
+      }
     },
     [items, finalTotal, discountAmount, serviceChargeAmount, vatAmount, vatIncluded, role, clear, paidSplits, remaining, tableId, lnInvoice, qrData, currentSerial]
   );
@@ -1060,7 +1065,9 @@ export default function CheckoutScreen() {
                 {paidSplits.map((s, i) => (
                   <View key={i} className="flex-row justify-between py-1">
                     <Text className="text-xs text-blue-800">{s.label}</Text>
-                    <Text className="text-xs text-green-700">฿{s.amount.toFixed(2)}</Text>
+                    <Text className={`text-xs ${s.status === 'pending' ? 'text-amber-700' : 'text-green-700'}`}>
+                      {s.status === 'pending' ? 'รอชำระ ' : ''}฿{s.amount.toFixed(2)}
+                    </Text>
                   </View>
                 ))}
                 <View className="flex-row justify-between mt-2 pt-2 border-t border-blue-200">
@@ -1139,7 +1146,9 @@ export default function CheckoutScreen() {
                 {paidSplits.map((s, i) => (
                   <View key={i} className="flex-row justify-between py-1">
                     <Text className="text-xs text-orange-800">{s.label}</Text>
-                    <Text className="text-xs text-green-700">฿{s.amount.toFixed(2)}</Text>
+                    <Text className={`text-xs ${s.status === 'pending' ? 'text-amber-700' : 'text-green-700'}`}>
+                      {s.status === 'pending' ? 'รอชำระ ' : ''}฿{s.amount.toFixed(2)}
+                    </Text>
                   </View>
                 ))}
                 <View className="flex-row justify-between mt-2 pt-2 border-t border-orange-200">
@@ -1188,10 +1197,23 @@ export default function CheckoutScreen() {
             <Text className="text-sm font-semibold text-green-700">฿{totalPaid.toFixed(2)}</Text>
           </View>
         )}
+        {totalPending > 0 && (
+          <View className="flex-row justify-between mt-1">
+            <Text className="text-sm text-amber-700 font-semibold">รอชำระ</Text>
+            <Text className="text-sm font-semibold text-amber-700">฿{totalPending.toFixed(2)}</Text>
+          </View>
+        )}
         {splitMode !== 'none' && remaining > 0 && remaining < finalTotal && (
           <View className="flex-row justify-between mt-1">
             <Text className="text-sm text-red-600 font-semibold">คงเหลือ</Text>
             <Text className="text-sm font-bold text-red-600">฿{remaining.toFixed(2)}</Text>
+          </View>
+        )}
+        {totalPending > 0 && remaining <= 0 && (
+          <View className="mt-3 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
+            <Text className="text-xs text-amber-700 text-center">
+              ยังมีรายการรอชำระ ต้องยืนยันจากหน้าประวัติธุรกรรมก่อนปิดบิล
+            </Text>
           </View>
         )}
       </View>
