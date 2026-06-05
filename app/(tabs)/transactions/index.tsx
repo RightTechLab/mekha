@@ -55,6 +55,8 @@ const PAYMENT_FILTERS: { label: string; value: string | null }[] = [
   { label: 'Lightning', value: 'lightning' },
 ];
 
+const INACTIVE_STATUSES = ['cancelled', 'voided', 'refunded', 'expired'];
+
 function formatCountdown(ms: number): string {
   const totalSeconds = Math.max(0, Math.ceil(ms / 1000));
   const hours = Math.floor(totalSeconds / 3600);
@@ -100,7 +102,13 @@ export default function TransactionsScreen() {
 
   useFocusEffect(loadData);
 
-  const totalFiltered = transactions.reduce((sum, t) => sum + t.amount_thb, 0);
+  const totalFiltered = transactions.reduce((sum, t) => {
+    const related = getTransactionsByOrderId(t.order_id);
+    const orderTotal = related.length > 1
+      ? related.reduce((orderSum, relatedTxn) => orderSum + relatedTxn.amount_thb, 0)
+      : t.amount_thb;
+    return sum + orderTotal;
+  }, 0);
 
   return (
     <SafeAreaView className="flex-1 bg-white" edges={['top']}>
@@ -178,6 +186,16 @@ export default function TransactionsScreen() {
   );
 }
 
+function getOrderDisplayStatus(transactions: Transaction[]): string {
+  if (transactions.some((t) => t.status === 'pending')) return 'pending';
+  if (transactions.length > 0 && transactions.every((t) => t.status === 'completed')) return 'completed';
+  if (transactions.some((t) => t.status === 'expired')) return 'expired';
+  if (transactions.some((t) => t.status === 'voided')) return 'voided';
+  if (transactions.some((t) => t.status === 'refunded')) return 'refunded';
+  if (transactions.some((t) => t.status === 'cancelled')) return 'cancelled';
+  return transactions[0]?.status ?? 'completed';
+}
+
 function TransactionCard({ txn, onChanged }: { txn: Transaction; onChanged: () => void }) {
   const [expanded, setExpanded] = useState(false);
   const [items, setItems] = useState<OrderItem[]>([]);
@@ -211,9 +229,11 @@ function TransactionCard({ txn, onChanged }: { txn: Transaction; onChanged: () =
   }, [expanded, txn.order_id]);
 
   const isSplitGroup = splitTxns.length > 1;
+  const groupedTxns = isSplitGroup ? splitTxns : [txn];
   const orderTotal = isSplitGroup
     ? splitTxns.reduce((sum, t) => sum + t.amount_thb, 0)
     : txn.amount_thb;
+  const displayStatus = getOrderDisplayStatus(groupedTxns);
 
   // Check if split uses multiple different payment methods
   const uniqueMethods = isSplitGroup
@@ -233,7 +253,7 @@ function TransactionCard({ txn, onChanged }: { txn: Transaction; onChanged: () =
   };
   const settleOrderIfAllCompleted = () => {
     const related = getTransactionsByOrderId(txn.order_id);
-    const active = related.filter((t) => !['cancelled', 'voided', 'refunded', 'expired'].includes(t.status));
+    const active = related.filter((t) => !INACTIVE_STATUSES.includes(t.status));
     if (active.length > 0 && active.every((t) => t.status === 'completed')) {
       updateOrderStatus(txn.order_id, 'paid');
     }
@@ -408,9 +428,9 @@ function TransactionCard({ txn, onChanged }: { txn: Transaction; onChanged: () =
         <Text className="text-xs text-mekha-muted">
           {format(new Date(txn.created_at), 'dd/MM/yy HH:mm')}
         </Text>
-        <View className={`px-2 py-0.5 rounded-full ${STATUS_COLORS[txn.status]?.split(' ')[0] ?? 'bg-gray-100'}`}>
-          <Text className={`text-xs font-medium ${STATUS_COLORS[txn.status]?.split(' ')[1] ?? 'text-gray-700'}`}>
-            {STATUS_LABELS[txn.status] ?? txn.status}
+        <View className={`px-2 py-0.5 rounded-full ${STATUS_COLORS[displayStatus]?.split(' ')[0] ?? 'bg-gray-100'}`}>
+          <Text className={`text-xs font-medium ${STATUS_COLORS[displayStatus]?.split(' ')[1] ?? 'text-gray-700'}`}>
+            {STATUS_LABELS[displayStatus] ?? displayStatus}
           </Text>
         </View>
       </View>
@@ -423,11 +443,18 @@ function TransactionCard({ txn, onChanged }: { txn: Transaction; onChanged: () =
         <View className="mt-3 pt-3 border-t border-mekha-border">
           <Text className="text-xs font-semibold text-mekha-text mb-2">การชำระเงิน ({splitTxns.length} รายการ)</Text>
           {splitTxns.map((st) => (
-            <View key={st.id} className="flex-row justify-between py-1">
-              <Text className="text-xs text-mekha-text">
-                {METHOD_LABELS[st.payment_method] ?? st.payment_method}
-                {st.serial_number && st.payment_method !== 'cash' ? ` #${String(st.serial_number).padStart(4, '0')}` : ''}
-              </Text>
+            <View key={st.id} className="flex-row justify-between gap-2 py-1">
+              <View className="flex-1">
+                <Text className="text-xs text-mekha-text">
+                  {METHOD_LABELS[st.payment_method] ?? st.payment_method}
+                  {st.serial_number && st.payment_method !== 'cash' ? ` #${String(st.serial_number).padStart(4, '0')}` : ''}
+                </Text>
+                {st.status !== 'completed' && (
+                  <Text className={`text-[10px] ${STATUS_COLORS[st.status]?.split(' ')[1] ?? 'text-gray-600'}`}>
+                    {STATUS_LABELS[st.status] ?? st.status}
+                  </Text>
+                )}
+              </View>
               <Text className="text-xs font-medium text-mekha-text">
                 ฿{st.amount_thb.toFixed(2)}
               </Text>
@@ -493,9 +520,9 @@ function TransactionCard({ txn, onChanged }: { txn: Transaction; onChanged: () =
           onSwitchMethod={handleSwitchMethod}
         />
       )}
-      {expanded && isSplitGroup && splitTxns.filter((st) => st.payment_method === 'promptpay' || st.payment_method === 'lightning').length > 0 && (
+      {expanded && isSplitGroup && splitTxns.filter((st) => (st.payment_method === 'promptpay' || st.payment_method === 'lightning') && !['cancelled', 'voided', 'refunded'].includes(st.status)).length > 0 && (
         <View className="mt-3">
-          {splitTxns.filter((st) => st.payment_method === 'promptpay' || st.payment_method === 'lightning').map((st) => (
+          {splitTxns.filter((st) => (st.payment_method === 'promptpay' || st.payment_method === 'lightning') && !['cancelled', 'voided', 'refunded'].includes(st.status)).map((st) => (
             <Pressable
               key={st.id}
               className="bg-purple-50 py-2 rounded-xl items-center mb-1"
