@@ -8,10 +8,15 @@ import { runMigrations } from '../src/db/migrations';
 import { useLnurlCacheStore } from '../src/features/payment/lnurlCacheStore';
 
 const queryClient = new QueryClient();
+let migrationsReady = false;
 
 export default function RootLayout() {
-  useEffect(() => {
+  if (!migrationsReady) {
     runMigrations();
+    migrationsReady = true;
+  }
+
+  useEffect(() => {
     // Pre-fetch LNURL step 1 on app startup
     const initLnurlCache = async () => {
       const store = useLnurlCacheStore.getState();
