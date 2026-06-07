@@ -3,7 +3,7 @@ import { View, Text, ScrollView, Pressable } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import { format, subDays } from 'date-fns';
+import { subDays } from 'date-fns';
 import {
   getTodayRevenue,
   getPaymentMethodBreakdown,
@@ -13,6 +13,7 @@ import {
 } from '../../../src/db/repositories/transactionRepo';
 import { exportTransactionsCsv } from '../../../src/lib/exportCsv';
 import { getTransactions } from '../../../src/db/repositories/transactionRepo';
+import { getBangkokDateKey } from '../../../src/lib/time';
 
 const DATE_RANGES = [
   { label: 'วันนี้', days: 0 },
@@ -47,12 +48,12 @@ export default function DashboardScreen() {
   const [maxDaily, setMaxDaily] = useState(0);
 
   const loadData = useCallback(() => {
-    const today = format(new Date(), 'yyyy-MM-dd');
+    const today = getBangkokDateKey();
     setTodayRevenue(getTodayRevenue());
 
     const startDate = selectedRange === 0
       ? today
-      : format(subDays(new Date(), selectedRange), 'yyyy-MM-dd');
+      : getBangkokDateKey(subDays(new Date(), selectedRange));
 
     const filtered = getFilteredRevenue(startDate, today, selectedMethod ?? undefined);
     setFilteredTotal(filtered.total);
@@ -260,7 +261,7 @@ export default function DashboardScreen() {
                 return (
                   <View key={day.date} className="flex-row items-center py-2 gap-3">
                     <Text className="text-xs text-mekha-muted w-12">
-                      {format(new Date(day.date), 'dd/MM')}
+                      {`${day.date.substring(8, 10)}/${day.date.substring(5, 7)}`}
                     </Text>
                     <View className="flex-1 h-5 bg-purple-50 rounded-full overflow-hidden">
                       <View

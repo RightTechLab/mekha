@@ -1,5 +1,6 @@
 import db from '../client';
 import type { PaymentMethod, Transaction, AuditLog, TransactionStatus } from '../../types';
+import { getBangkokDateKey, sqliteBangkokDateExpr } from '../../lib/time';
 
 export function createTransaction(txn: Omit<Transaction, 'created_at'>): void {
   db.runSync(
@@ -108,7 +109,7 @@ export function getTransactions(options?: {
   const params: (string | number)[] = [];
 
   if (options?.date) {
-    query += ' AND date(created_at) = ?';
+    query += ` AND ${sqliteBangkokDateExpr('created_at')} = ?`;
     params.push(options.date);
   }
   if (options?.method) {
@@ -156,9 +157,9 @@ export function voidTransaction(id: string, reason: string): void {
 }
 
 export function getTodayRevenue(): number {
-  const today = new Date().toISOString().split('T')[0];
+  const today = getBangkokDateKey();
   const result = db.getFirstSync<{ total: number }>(
-    `SELECT COALESCE(SUM(amount_thb), 0) as total FROM transactions WHERE date(created_at) = ? AND status = 'completed'`,
+    `SELECT COALESCE(SUM(amount_thb), 0) as total FROM transactions WHERE ${sqliteBangkokDateExpr('created_at')} = ? AND status = 'completed'`,
     [today]
   );
   return result?.total ?? 0;
@@ -169,11 +170,11 @@ export function getRevenueByDateRange(
   endDate: string
 ): { date: string; total: number }[] {
   return db.getAllSync<{ date: string; total: number }>(
-    `SELECT date(created_at) as date, SUM(amount_thb) as total
+    `SELECT ${sqliteBangkokDateExpr('created_at')} as date, SUM(amount_thb) as total
      FROM transactions
-     WHERE date(created_at) BETWEEN ? AND ? AND status = 'completed'
-     GROUP BY date(created_at)
-     ORDER BY date(created_at)`,
+     WHERE ${sqliteBangkokDateExpr('created_at')} BETWEEN ? AND ? AND status = 'completed'
+     GROUP BY ${sqliteBangkokDateExpr('created_at')}
+     ORDER BY ${sqliteBangkokDateExpr('created_at')}`,
     [startDate, endDate]
   );
 }
@@ -188,11 +189,11 @@ export function getPaymentMethodBreakdown(startDate?: string, endDate?: string):
      WHERE status = 'completed'`;
   const params: string[] = [];
   if (startDate) {
-    query += ' AND date(created_at) >= ?';
+    query += ` AND ${sqliteBangkokDateExpr('created_at')} >= ?`;
     params.push(startDate);
   }
   if (endDate) {
-    query += ' AND date(created_at) <= ?';
+    query += ` AND ${sqliteBangkokDateExpr('created_at')} <= ?`;
     params.push(endDate);
   }
   query += ' GROUP BY payment_method';
@@ -213,11 +214,11 @@ export function getTopMenuItems(
   if (startDate || endDate || paymentMethod) {
     query += ' AND o.id IN (SELECT order_id FROM transactions WHERE status = \'completed\'';
     if (startDate) {
-      query += ' AND date(created_at) >= ?';
+      query += ` AND ${sqliteBangkokDateExpr('created_at')} >= ?`;
       params.push(startDate);
     }
     if (endDate) {
-      query += ' AND date(created_at) <= ?';
+      query += ` AND ${sqliteBangkokDateExpr('created_at')} <= ?`;
       params.push(endDate);
     }
     if (paymentMethod) {
@@ -238,7 +239,7 @@ export function getFilteredRevenue(
 ): { total: number; count: number } {
   let query = `SELECT COALESCE(SUM(amount_thb), 0) as total, COUNT(*) as count
      FROM transactions
-     WHERE status = 'completed' AND date(created_at) BETWEEN ? AND ?`;
+     WHERE status = 'completed' AND ${sqliteBangkokDateExpr('created_at')} BETWEEN ? AND ?`;
   const params: string[] = [startDate, endDate];
   if (paymentMethod) {
     query += ' AND payment_method = ?';
@@ -253,15 +254,15 @@ export function getFilteredRevenueByDate(
   endDate: string,
   paymentMethod?: string
 ): { date: string; total: number }[] {
-  let query = `SELECT date(created_at) as date, SUM(amount_thb) as total
+  let query = `SELECT ${sqliteBangkokDateExpr('created_at')} as date, SUM(amount_thb) as total
      FROM transactions
-     WHERE status = 'completed' AND date(created_at) BETWEEN ? AND ?`;
+     WHERE status = 'completed' AND ${sqliteBangkokDateExpr('created_at')} BETWEEN ? AND ?`;
   const params: string[] = [startDate, endDate];
   if (paymentMethod) {
     query += ' AND payment_method = ?';
     params.push(paymentMethod);
   }
-  query += ' GROUP BY date(created_at) ORDER BY date(created_at)';
+  query += ` GROUP BY ${sqliteBangkokDateExpr('created_at')} ORDER BY ${sqliteBangkokDateExpr('created_at')}`;
   return db.getAllSync<{ date: string; total: number }>(query, params);
 }
 

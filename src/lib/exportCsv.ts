@@ -1,6 +1,7 @@
 import { File, Paths } from 'expo-file-system/next';
 import * as Sharing from 'expo-sharing';
 import type { Transaction } from '../types';
+import { formatBangkokDate, formatBangkokDateTime, formatBangkokTime } from './time';
 
 function escapeCsvField(field: string): string {
   if (field.includes(',') || field.includes('"') || field.includes('\n')) {
@@ -31,7 +32,7 @@ export async function exportTransactionsCsv(
 
   const rows = transactions.map((t) => [
     t.id,
-    t.created_at,
+    formatBangkokDateTime(t.created_at),
     t.payment_method,
     t.amount_thb.toString(),
     t.amount_sat?.toString() ?? '',
@@ -73,8 +74,8 @@ export async function exportLightningReportCsv(
   ];
 
   const dataRows = transactions.map((t) => [
-    t.created_at.substring(0, 10),
-    t.created_at.substring(11, 19),
+    formatBangkokDate(t.created_at),
+    formatBangkokTime(t.created_at),
     t.amount_thb.toFixed(2),
     t.amount_sat?.toString() ?? '',
     t.btc_rate_thb?.toString() ?? '',

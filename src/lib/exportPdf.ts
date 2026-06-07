@@ -1,6 +1,7 @@
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import type { Transaction, OrderItem } from '../types';
+import { formatBangkokDate, formatBangkokDateTime, formatBangkokTime, getBangkokDateKey } from './time';
 
 interface ReceiptData {
   shopName: string;
@@ -38,7 +39,7 @@ export async function generateReceipt(data: ReceiptData): Promise<void> {
       <body>
         <h1>${shopName}</h1>
         <div class="divider"></div>
-        <p style="font-size:12px;color:#666;">${transaction.created_at}</p>
+        <p style="font-size:12px;color:#666;">${formatBangkokDateTime(transaction.created_at)}</p>
         <table>
           <tr style="font-weight:bold;border-bottom:1px solid #ddd;">
             <td>Item</td>
@@ -75,8 +76,8 @@ export async function generateLightningReport(
     .map(
       (t) =>
         `<tr>
-          <td>${t.created_at.substring(0, 10)}</td>
-          <td>${t.created_at.substring(11, 19)}</td>
+          <td>${formatBangkokDate(t.created_at)}</td>
+          <td>${formatBangkokTime(t.created_at)}</td>
           <td style="text-align:right">฿${t.amount_thb.toFixed(2)}</td>
           <td style="text-align:right">${t.amount_sat?.toLocaleString() ?? '-'}</td>
           <td style="text-align:right">${t.btc_rate_thb?.toLocaleString() ?? '-'}</td>
@@ -138,7 +139,7 @@ export async function generateLightningReport(
         </table>
 
         <div class="footer">
-          สร้างโดย ${shopName} via Mekha POS — ${new Date().toISOString().substring(0, 10)}
+          สร้างโดย ${shopName} via Mekha POS — ${getBangkokDateKey()}
         </div>
       </body>
     </html>

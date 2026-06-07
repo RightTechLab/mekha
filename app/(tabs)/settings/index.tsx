@@ -8,7 +8,7 @@ import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import * as DocumentPicker from 'expo-document-picker';
 import * as Haptics from 'expo-haptics';
-import { format, subDays } from 'date-fns';
+import { subDays } from 'date-fns';
 import { router } from 'expo-router';
 import { useSessionStore } from '../../../src/features/auth/sessionStore';
 import { getSetting, setSetting, getTransactions } from '../../../src/db/repositories/transactionRepo';
@@ -17,6 +17,7 @@ import { getAllTables, createTable, deleteTable } from '../../../src/db/reposito
 import { useLnurlCacheStore } from '../../../src/features/payment/lnurlCacheStore';
 import db from '../../../src/db/client';
 import { generateLightningReport } from '../../../src/lib/exportPdf';
+import { getBangkokDateKey } from '../../../src/lib/time';
 import type { TableItem } from '../../../src/db/repositories/tableRepo';
 
 export default function SettingsScreen() {
@@ -430,12 +431,12 @@ export default function SettingsScreen() {
   };
 
   const handleLightningReport = async (days: number) => {
-    const endDate = format(new Date(), 'yyyy-MM-dd');
-    const startDate = format(subDays(new Date(), days), 'yyyy-MM-dd');
+    const endDate = getBangkokDateKey();
+    const startDate = getBangkokDateKey(subDays(new Date(), days));
     const shopName = getSetting('shop_name') ?? 'Mekha';
 
     const txns = getTransactions({ method: 'lightning', limit: 10000 }).filter((t) => {
-      const d = t.created_at.substring(0, 10);
+      const d = getBangkokDateKey(new Date(`${t.created_at.replace(' ', 'T')}Z`));
       return d >= startDate && d <= endDate && t.status === 'completed';
     });
 

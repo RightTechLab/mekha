@@ -3,7 +3,7 @@ import { View, Text, Pressable, ScrollView, Modal, TouchableWithoutFeedback, Ale
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { FlashList } from '@shopify/flash-list';
-import { format, subDays } from 'date-fns';
+import { subDays } from 'date-fns';
 import * as SecureStore from 'expo-secure-store';
 import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
@@ -15,6 +15,7 @@ import { generatePromptPayQR } from '../../../src/lib/promptpay';
 import { checkVerifyUrl, parseInvoiceExpiry } from '../../../src/lib/lightning';
 import { getBtcRateThb, thbToSats } from '../../../src/lib/exchangeRate';
 import { useLnurlCacheStore } from '../../../src/features/payment/lnurlCacheStore';
+import { formatBangkokDateTime, getBangkokDateKey } from '../../../src/lib/time';
 import type { PaymentMethod, Transaction, OrderItem } from '../../../src/types';
 
 const METHOD_LABELS: Record<string, string> = {
@@ -77,16 +78,16 @@ export default function TransactionsScreen() {
   const [selectedMethod, setSelectedMethod] = useState<string | null>(null);
 
   const loadData = useCallback(() => {
-    const today = format(new Date(), 'yyyy-MM-dd');
+    const today = getBangkokDateKey();
     const startDate = selectedRange === 0
       ? today
-      : format(subDays(new Date(), selectedRange), 'yyyy-MM-dd');
+      : getBangkokDateKey(subDays(new Date(), selectedRange));
 
     const allTxns = getTransactions({
       method: selectedMethod ?? undefined,
       limit: 500,
     }).filter((t) => {
-      const txnDate = t.created_at.substring(0, 10);
+      const txnDate = getBangkokDateKey(new Date(`${t.created_at.replace(' ', 'T')}Z`));
       return txnDate >= startDate && txnDate <= today;
     });
 
@@ -444,7 +445,7 @@ function TransactionCard({ txn, onChanged }: { txn: Transaction; onChanged: () =
       </View>
       <View className="flex-row items-center justify-between">
         <Text className="text-xs text-mekha-muted">
-          {format(new Date(txn.created_at), 'dd/MM/yy HH:mm')}
+          {formatBangkokDateTime(txn.created_at)}
         </Text>
         <View className={`px-2 py-0.5 rounded-full ${STATUS_COLORS[displayStatus]?.split(' ')[0] ?? 'bg-gray-100'}`}>
           <Text className={`text-xs font-medium ${STATUS_COLORS[displayStatus]?.split(' ')[1] ?? 'text-gray-700'}`}>
