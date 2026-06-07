@@ -28,24 +28,16 @@ import { getBtcRateThb, thbToSats } from '../../../src/lib/exchangeRate';
 import { fetchLnurlPayParams, requestInvoice, createTimingLog, reportTimingLog, parseInvoiceExpiry, checkVerifyUrl, pollInvoice } from '../../../src/lib/lightning';
 import { useLnurlCacheStore } from '../../../src/features/payment/lnurlCacheStore';
 import NumPad from '../../../src/components/NumPad';
-import type { PaymentMethod } from '../../../src/types';
+import type { CheckoutSplitRecord, PaymentMethod } from '../../../src/types';
 import QRCode from 'react-native-qrcode-svg';
 
 type CheckoutStep = 'summary' | 'payment' | 'cash' | 'promptpay' | 'lightning' | 'done';
 type SplitMode = 'none' | 'equal' | 'items';
-type SplitRecord = {
-  label: string;
-  amount: number;
-  method: PaymentMethod;
-  status: 'pending' | 'completed';
-  amountSat: number | null;
-  btcRate: number | null;
-  invoice: string | null;
-  verifyUrl: string | null;
-  qrRef: string | null;
-  serial: number | null;
-  transactionId: string | null;
-  unitIndices: number[];
+type SplitRecord = CheckoutSplitRecord;
+type SuccessData = {
+  total: number;
+  splits: SplitRecord[];
+  hasPending: boolean;
 };
 
 function formatCountdown(ms: number): string {
@@ -60,8 +52,29 @@ function formatCountdown(ms: number): string {
   return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
 }
 
+const PAYMENT_LABELS: Record<PaymentMethod, string> = {
+  cash: 'เงินสด',
+  promptpay: 'PromptPay',
+  lightning: 'Lightning',
+};
+
 export default function CheckoutScreen() {
-  const { items, getTotal, getSubtotal, discount, clear, updateQty, removeItem, setDiscount, tableId, tableName } = useCartStore();
+  const {
+    items,
+    getTotal,
+    getSubtotal,
+    discount,
+    clear,
+    updateQty,
+    removeItem,
+    setDiscount,
+    tableId,
+    tableName,
+    saveCheckoutSession,
+    getCheckoutSession,
+    clearCheckoutSession,
+    hasActiveCheckoutSession,
+  } = useCartStore();
   const insets = useSafeAreaInsets();
   const role = useSessionStore((s) => s.role);
   const { width, height } = useWindowDimensions();
@@ -91,6 +104,8 @@ export default function CheckoutScreen() {
   const [paidUnitIndices, setPaidUnitIndices] = useState<Set<number>>(new Set());
   const [paidSplits, setPaidSplits] = useState<SplitRecord[]>([]);
   const [activePendingIndex, setActivePendingIndex] = useState<number | null>(null);
+  const [checkoutOrderId, setCheckoutOrderId] = useState<string | null>(null);
+  const [successData, setSuccessData] = useState<SuccessData | null>(null);
   const orderIdRef = useRef<string | null>(null);
 
   // Expiry countdown timer
@@ -183,6 +198,8 @@ export default function CheckoutScreen() {
   const totalPending = paidSplits.filter((s) => s.status === 'pending').reduce((sum, s) => sum + s.amount, 0);
   const totalAllocated = totalPaid + totalPending;
   const remaining = finalTotal - totalAllocated;
+  const hasPaymentsStarted = paidSplits.length > 0;
+  const isCartLocked = hasActiveCheckoutSession();
   const currentPayAmount =
     splitMode === 'equal'
       ? splitPerPerson
@@ -192,7 +209,7 @@ export default function CheckoutScreen() {
   const activePendingSplit = activePendingIndex != null ? paidSplits[activePendingIndex] : null;
 
   const getPayableAmount = () => {
-    if (splitMode === 'none') return finalTotal;
+    if (splitMode === 'none') return totalAllocated > 0 ? Math.max(0, remaining) : finalTotal;
     if (splitMode === 'equal') return Math.min(splitPerPerson, remaining);
     if (splitMode === 'items') return Math.min(selectedItemsTotal, remaining);
     return finalTotal;
@@ -212,6 +229,7 @@ export default function CheckoutScreen() {
 
     const orderId = Crypto.randomUUID();
     orderIdRef.current = orderId;
+    setCheckoutOrderId(orderId);
     createOrder({ id: orderId, status: 'open', note: null, table_id: tableId });
 
     if (tableId) {
@@ -233,6 +251,31 @@ export default function CheckoutScreen() {
 
     return orderId;
   };
+
+  useEffect(() => {
+    const session = getCheckoutSession();
+    if (!session) return;
+
+    orderIdRef.current = session.orderId;
+    setCheckoutOrderId(session.orderId);
+    setPaidSplits(session.paidSplits);
+    setSplitMode(session.splitMode);
+    setCustomerCount(session.customerCount);
+    setPaidUnitIndices(new Set(session.paidUnitIndices));
+  }, []);
+
+  useEffect(() => {
+    if (step === 'done') return;
+    if (!checkoutOrderId && paidSplits.length === 0) return;
+
+    saveCheckoutSession({
+      orderId: checkoutOrderId,
+      paidSplits,
+      splitMode,
+      customerCount,
+      paidUnitIndices: Array.from(paidUnitIndices),
+    });
+  }, [checkoutOrderId, paidSplits, splitMode, customerCount, paidUnitIndices, step, saveCheckoutSession]);
 
   const applySplitMode = (mode: SplitMode) => {
     setSplitMode(mode);
@@ -311,8 +354,9 @@ export default function CheckoutScreen() {
           clearTable(tableId);
         }
         await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        setSuccessData({ total: finalTotal, splits, hasPending: false });
         clear();
-        router.back();
+        setStep('done');
         return true;
       }
 
@@ -536,7 +580,7 @@ export default function CheckoutScreen() {
 
       const newAllocated = newSplits.reduce((sum, s) => sum + s.amount, 0);
       if (newAllocated >= finalTotal - 0.01) {
-        setStep('summary');
+      setStep('summary');
       } else {
         setStep('summary');
       }
@@ -617,8 +661,25 @@ export default function CheckoutScreen() {
       if (hasPending) {
         setStep('summary');
       } else {
+        const successSplits = splits.length > 0
+          ? splits
+          : [{
+              label: `ชำระเต็มบิล (${method})`,
+              amount: finalTotal,
+              method,
+              status: 'completed' as const,
+              amountSat: extra?.amountSat ?? null,
+              btcRate: extra?.btcRate ?? null,
+              invoice: method === 'lightning' ? lnInvoice : null,
+              verifyUrl: method === 'lightning' ? lnVerifyUrl : null,
+              qrRef: method === 'promptpay' ? qrData : null,
+              serial: method === 'cash' ? null : currentSerial,
+              transactionId: null,
+              unitIndices: [],
+            }];
+        setSuccessData({ total: finalTotal, splits: successSplits, hasPending: false });
         clear();
-        router.back();
+        setStep('done');
       }
     },
     [items, finalTotal, discountAmount, serviceChargeAmount, vatAmount, vatIncluded, role, clear, paidSplits, remaining, tableId, lnInvoice, qrData, currentSerial]
@@ -855,8 +916,58 @@ export default function CheckoutScreen() {
     }
   }, [lnAutoConfirmed]);
 
+  if (step === 'done' && successData) {
+    return (
+      <SafeAreaView className="flex-1 bg-white px-6 pt-10">
+        <View className="flex-1 items-center justify-center">
+          <Text className="text-xl font-semibold text-mekha-text">บันทึกบิลแล้ว</Text>
+          <Text className="text-3xl font-bold text-purple-600 mt-2">฿{successData.total.toFixed(2)}</Text>
+          <View className="w-20 h-20 rounded-3xl bg-green-500 items-center justify-center mt-6 mb-6">
+            <Ionicons name="checkmark" size={52} color="white" />
+          </View>
+          <Text className="text-mekha-muted text-center mb-6">
+            ทุกรายการชำระเงินได้รับการยืนยันแล้ว
+          </Text>
+
+          <View className="w-full border-t border-mekha-border pt-4 mb-6">
+            {successData.splits.map((split, index) => (
+              <View
+                key={`${split.transactionId ?? split.label}-${index}`}
+                className="flex-row items-center justify-between bg-purple-50 rounded-xl px-4 py-3 mb-2"
+              >
+                <View className="flex-1 mr-3">
+                  <Text className="text-sm font-medium text-purple-700">
+                    {split.serial != null ? `#${String(split.serial).padStart(4, '0')} ` : ''}
+                    {PAYMENT_LABELS[split.method]}
+                  </Text>
+                  <Text className="text-xs text-green-700 mt-1">ชำระแล้ว</Text>
+                </View>
+                <Text className="text-sm font-bold text-purple-700">฿{split.amount.toFixed(2)}</Text>
+              </View>
+            ))}
+          </View>
+
+          <View className="w-full flex-row gap-2">
+            <Pressable
+              className="flex-1 py-4 rounded-2xl items-center border border-purple-600"
+              onPress={() => router.replace('/(tabs)/transactions')}
+            >
+              <Text className="text-purple-700 font-semibold">ดูประวัติ</Text>
+            </Pressable>
+            <Pressable
+              className="flex-1 py-4 rounded-2xl items-center bg-purple-600"
+              onPress={() => router.back()}
+            >
+              <Text className="text-white font-semibold">ย้อนกลับ</Text>
+            </Pressable>
+          </View>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   if (step === 'cash') {
-    const payAmount = splitMode !== 'none' ? getPayableAmount() : finalTotal;
+    const payAmount = getPayableAmount();
     const received = parseFloat(receivedAmount) || 0;
     const change = received - payAmount;
     const canConfirm = received > 0 && received >= payAmount - 0.01;
@@ -908,7 +1019,7 @@ export default function CheckoutScreen() {
   }
 
   if (step === 'promptpay') {
-    const payAmount = activePendingSplit ? activePendingSplit.amount : splitMode !== 'none' ? getPayableAmount() : finalTotal;
+    const payAmount = activePendingSplit ? activePendingSplit.amount : getPayableAmount();
     return (
       <SafeAreaView className="flex-1 bg-white items-center justify-center px-8">
         <Text className="text-xl font-bold text-mekha-text mb-2">PromptPay</Text>
@@ -964,7 +1075,7 @@ export default function CheckoutScreen() {
   }
 
   if (step === 'lightning') {
-    const payAmount = activePendingSplit ? activePendingSplit.amount : splitMode !== 'none' ? getPayableAmount() : finalTotal;
+    const payAmount = activePendingSplit ? activePendingSplit.amount : getPayableAmount();
     return (
       <SafeAreaView className="flex-1 bg-white items-center justify-center px-8">
         <Text className="text-xl font-bold text-mekha-text mb-2">Lightning</Text>
@@ -1158,25 +1269,31 @@ export default function CheckoutScreen() {
           </View>
           <View className="flex-row items-center mt-2 gap-2">
             <Pressable
-              className="w-8 h-8 rounded-full bg-red-50 items-center justify-center"
+              className={`w-8 h-8 rounded-full items-center justify-center ${isCartLocked ? 'bg-gray-100' : 'bg-red-50'}`}
               onPress={() => {
+                if (isCartLocked) return;
                 if (item.quantity <= 1) {
                   removeItem(item.menuId);
                 } else {
                   updateQty(item.menuId, item.quantity - 1);
                 }
               }}
+              disabled={isCartLocked}
             >
-              <Text className="text-red-700 font-bold text-base">
+              <Text className={`${isCartLocked ? 'text-gray-400' : 'text-red-700'} font-bold text-base`}>
                 {item.quantity <= 1 ? '✕' : '−'}
               </Text>
             </Pressable>
             <Text className="text-sm font-medium w-8 text-center">{item.quantity}</Text>
             <Pressable
-              className="w-8 h-8 rounded-full bg-purple-50 items-center justify-center"
-              onPress={() => updateQty(item.menuId, item.quantity + 1)}
+              className={`w-8 h-8 rounded-full items-center justify-center ${isCartLocked ? 'bg-gray-100' : 'bg-purple-50'}`}
+              onPress={() => {
+                if (isCartLocked) return;
+                updateQty(item.menuId, item.quantity + 1);
+              }}
+              disabled={isCartLocked}
             >
-              <Text className="text-purple-700 font-bold text-base">+</Text>
+              <Text className={`${isCartLocked ? 'text-gray-400' : 'text-purple-700'} font-bold text-base`}>+</Text>
             </Pressable>
             <Text className="text-xs text-mekha-muted ml-1">@฿{item.unitPrice}</Text>
           </View>
@@ -1204,6 +1321,7 @@ export default function CheckoutScreen() {
                     : 'bg-purple-50 border-purple-200'
                 }`}
                 onPress={() => {
+                  if (isCartLocked) return;
                   if (isActive) {
                     setDiscount(null);
                   } else {
@@ -1211,6 +1329,7 @@ export default function CheckoutScreen() {
                     setShowCustomDiscount(false);
                   }
                 }}
+                disabled={isCartLocked}
               >
                 <Text
                   className={`text-sm font-medium ${
@@ -1232,12 +1351,14 @@ export default function CheckoutScreen() {
                 : 'bg-purple-50 border-purple-200'
             }`}
             onPress={() => {
+              if (isCartLocked) return;
               setShowCustomDiscount(!showCustomDiscount);
               if (showCustomDiscount) {
                 setDiscount(null);
                 setCustomDiscountValue('');
               }
             }}
+            disabled={isCartLocked}
           >
             <Text
               className={`text-sm font-medium ${
@@ -1251,10 +1372,12 @@ export default function CheckoutScreen() {
             <Pressable
               className="py-2 px-4 rounded-xl items-center bg-red-50 border border-red-200"
               onPress={() => {
+                if (isCartLocked) return;
                 setDiscount(null);
                 setShowCustomDiscount(false);
                 setCustomDiscountValue('');
               }}
+              disabled={isCartLocked}
             >
               <Text className="text-sm font-medium text-red-700">ยกเลิก</Text>
             </Pressable>
@@ -1305,12 +1428,14 @@ export default function CheckoutScreen() {
               <Pressable
                 className="bg-purple-600 px-4 py-2 rounded-lg"
                 onPress={() => {
+                  if (isCartLocked) return;
                   const val = parseFloat(customDiscountValue);
                   if (!val || val <= 0) return;
                   if (customDiscountType === 'percent' && val > 100) return;
                   if (customDiscountType === 'fixed' && val > subtotal) return;
                   setDiscount({ type: customDiscountType, value: val });
                 }}
+                disabled={isCartLocked}
               >
                 <Text className="text-white text-sm font-medium">ตกลง</Text>
               </Pressable>
@@ -1472,6 +1597,22 @@ export default function CheckoutScreen() {
       </View>
 
       {/* Totals */}
+      {splitMode === 'none' && paidSplits.length > 0 && (
+        <View className="mb-4 p-4 bg-purple-50 border border-purple-200 rounded-xl">
+          <Text className="text-sm font-semibold text-purple-900 mb-2">รายการชำระเงิน</Text>
+          {renderSplitHistory('blue')}
+        </View>
+      )}
+
+      {isCartLocked && (
+        <View className="mb-4 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
+          <Text className="text-xs text-amber-700 text-center">
+            เริ่มรับชำระเงินแล้ว รายการอาหารจะถูกล็อกจนกว่าจะปิดบิล
+          </Text>
+        </View>
+      )}
+
+      {/* Totals */}
       <View className={`border-t border-mekha-border pt-4 ${isLandscape ? '' : 'mt-4'}`}>
         <View className="flex-row justify-between mb-1">
           <Text className="text-mekha-muted">ยอดรวม</Text>
@@ -1532,42 +1673,42 @@ export default function CheckoutScreen() {
 
       <Pressable
         className={`w-full py-4 rounded-2xl items-center border mb-3 ${
-          items.length > 0 ? 'bg-green-50 border-green-700' : 'bg-gray-100 border-gray-300'
+          items.length > 0 && getPayableAmount() > 0 ? 'bg-green-50 border-green-700' : 'bg-gray-100 border-gray-300'
         }`}
         onPress={() => handlePayment('cash')}
-        disabled={items.length === 0}
+        disabled={items.length === 0 || getPayableAmount() <= 0}
       >
-        <Text className={`font-semibold ${items.length > 0 ? 'text-green-700' : 'text-gray-400'}`}>
+        <Text className={`font-semibold ${items.length > 0 && getPayableAmount() > 0 ? 'text-green-700' : 'text-gray-400'}`}>
           เงินสด
         </Text>
       </Pressable>
 
       <Pressable
         className={`w-full py-4 rounded-2xl items-center border mb-3 ${
-          items.length > 0 ? 'bg-blue-50 border-blue-700' : 'bg-gray-100 border-gray-300'
+          items.length > 0 && getPayableAmount() > 0 ? 'bg-blue-50 border-blue-700' : 'bg-gray-100 border-gray-300'
         }`}
         onPress={() => handlePayment('promptpay')}
-        disabled={items.length === 0}
+        disabled={items.length === 0 || getPayableAmount() <= 0}
       >
-        <Text className={`font-semibold ${items.length > 0 ? 'text-blue-700' : 'text-gray-400'}`}>
+        <Text className={`font-semibold ${items.length > 0 && getPayableAmount() > 0 ? 'text-blue-700' : 'text-gray-400'}`}>
           PromptPay
         </Text>
       </Pressable>
 
       <Pressable
         className={`w-full py-4 rounded-2xl items-center border mb-3 ${
-          items.length > 0 ? 'bg-yellow-50 border-yellow-700' : 'bg-gray-100 border-gray-300'
+          items.length > 0 && getPayableAmount() > 0 ? 'bg-yellow-50 border-yellow-700' : 'bg-gray-100 border-gray-300'
         }`}
         onPress={() => handlePayment('lightning')}
-        disabled={items.length === 0}
+        disabled={items.length === 0 || getPayableAmount() <= 0}
       >
-        <Text className={`font-semibold ${items.length > 0 ? 'text-yellow-700' : 'text-gray-400'}`}>
+        <Text className={`font-semibold ${items.length > 0 && getPayableAmount() > 0 ? 'text-yellow-700' : 'text-gray-400'}`}>
           Lightning
         </Text>
       </Pressable>
 
       <Pressable className="items-center py-3" onPress={() => router.back()}>
-        <Text className="text-mekha-muted">ยกเลิก</Text>
+        <Text className="text-mekha-muted">ย้อนกลับ</Text>
       </Pressable>
     </>
   );

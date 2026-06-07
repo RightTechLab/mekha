@@ -28,13 +28,15 @@ export default function PosScreen() {
   const [showCustomAmount, setShowCustomAmount] = useState(false);
   const [keypadDigits, setKeypadDigits] = useState('');
   const [keypadNote, setKeypadNote] = useState('');
-  const { items, addItem, removeItem, updateQty, getTotal, clear, tableId, tableName, switchTable, getTableItemCount } = useCartStore();
+  const { items, addItem, removeItem, updateQty, getTotal, clear, tableId, tableName, switchTable, getTableItemCount, hasActiveCheckoutSession } = useCartStore();
+  const hasActivePaymentSession = hasActiveCheckoutSession();
 
   // Keypad amount (direct entry: "50" = ฿50, "12.5" = ฿12.50)
   const keypadAmount = parseFloat(keypadDigits || '0') || 0;
 
   const handleKeypadAdd = useCallback(() => {
     if (keypadAmount > 0) {
+      if (hasActivePaymentSession) return;
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       addItem({
         menuId: `custom-${Crypto.randomUUID()}`,
@@ -48,11 +50,11 @@ export default function PosScreen() {
       setKeypadDigits('');
       setKeypadNote('');
     }
-  }, [keypadDigits, keypadAmount, keypadNote, addItem]);
+  }, [keypadDigits, keypadAmount, keypadNote, addItem, hasActivePaymentSession]);
 
   const handleKeypadCheckout = useCallback(() => {
     // Add current amount if any, then go to checkout
-    if (keypadAmount > 0) {
+    if (keypadAmount > 0 && !hasActivePaymentSession) {
       addItem({
         menuId: `custom-${Crypto.randomUUID()}`,
         name: keypadNote.trim() || 'รายการกำหนดเอง',
@@ -69,7 +71,7 @@ export default function PosScreen() {
     if (items.length > 0 || keypadAmount > 0) {
       router.push('/(tabs)/pos/checkout');
     }
-  }, [keypadAmount, keypadNote, addItem, items.length]);
+  }, [keypadAmount, keypadNote, addItem, items.length, hasActivePaymentSession]);
 
   useFocusEffect(
     useCallback(() => {
@@ -94,9 +96,10 @@ export default function PosScreen() {
   const handleAddToCart = useCallback(
     (menu: Menu) => {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      if (hasActivePaymentSession) return;
       setSelectedMenu(menu);
     },
-    []
+    [hasActivePaymentSession]
   );
 
   const handleSwitchTable = useCallback(
@@ -208,15 +211,15 @@ export default function PosScreen() {
               {/* Add item button (+ above checkout) */}
               <Pressable
                 className={`w-full py-3 rounded-2xl items-center mb-2 ${
-                  keypadAmount > 0 ? 'bg-purple-50 border border-purple-200' : 'bg-gray-50 border border-gray-200'
+                  keypadAmount > 0 && !hasActivePaymentSession ? 'bg-purple-50 border border-purple-200' : 'bg-gray-50 border border-gray-200'
                 }`}
                 onPress={handleKeypadAdd}
-                disabled={keypadAmount <= 0}
+                disabled={keypadAmount <= 0 || hasActivePaymentSession}
               >
                 <View className="flex-row items-center gap-1.5">
-                  <Ionicons name="add-circle" size={18} color={keypadAmount > 0 ? '#7C3AED' : '#9CA3AF'} />
-                  <Text className={`font-semibold text-sm ${keypadAmount > 0 ? 'text-purple-700' : 'text-gray-400'}`}>
-                    เพิ่มรายการ
+                  <Ionicons name="add-circle" size={18} color={keypadAmount > 0 && !hasActivePaymentSession ? '#7C3AED' : '#9CA3AF'} />
+                  <Text className={`font-semibold text-sm ${keypadAmount > 0 && !hasActivePaymentSession ? 'text-purple-700' : 'text-gray-400'}`}>
+                    {hasActivePaymentSession ? 'ล็อกระหว่างรับชำระ' : 'เพิ่มรายการ'}
                   </Text>
                 </View>
               </Pressable>
@@ -350,8 +353,9 @@ export default function PosScreen() {
               contentContainerStyle={{ padding: 8, paddingBottom: insets.bottom + 80 }}
               renderItem={({ item }) => (
                 <Pressable
-                  className="flex-1 m-1 bg-mekha-surface border border-mekha-border rounded-2xl p-3 items-center active:bg-purple-50"
+                  className={`flex-1 m-1 border border-mekha-border rounded-2xl p-3 items-center ${hasActivePaymentSession ? 'bg-gray-50 opacity-60' : 'bg-mekha-surface active:bg-purple-50'}`}
                   onPress={() => handleAddToCart(item)}
+                  disabled={hasActivePaymentSession}
                 >
                   {item.image_path ? (
                     <Image
@@ -397,6 +401,7 @@ export default function PosScreen() {
               onRemove={removeItem}
               onCheckout={handleCheckout}
               onClear={clear}
+              locked={hasActivePaymentSession}
             />
           ) : (
             <View className="px-4 py-3">
@@ -434,6 +439,7 @@ function CartPanel({
   onRemove,
   onCheckout,
   onClear,
+  locked,
 }: {
   items: CartItem[];
   total: number;
@@ -441,14 +447,15 @@ function CartPanel({
   onRemove: (menuId: string) => void;
   onCheckout: () => void;
   onClear: () => void;
+  locked: boolean;
 }) {
   return (
     <View className="flex-1 p-4">
       <View className="flex-row items-center justify-between mb-4">
         <Text className="text-lg font-bold text-mekha-text">ตะกร้า</Text>
         {items.length > 0 && (
-          <Pressable onPress={onClear}>
-            <Text className="text-sm text-red-700">ล้าง</Text>
+          <Pressable onPress={onClear} disabled={locked}>
+            <Text className={`text-sm ${locked ? 'text-gray-400' : 'text-red-700'}`}>ล้าง</Text>
           </Pressable>
         )}
       </View>
@@ -479,17 +486,19 @@ function CartPanel({
                 </View>
                 <View className="flex-row items-center gap-2">
                   <Pressable
-                    className="w-7 h-7 rounded-full bg-purple-50 items-center justify-center"
+                    className={`w-7 h-7 rounded-full items-center justify-center ${locked ? 'bg-gray-100' : 'bg-purple-50'}`}
                     onPress={() => onUpdateQty(item.menuId, item.quantity - 1)}
+                    disabled={locked}
                   >
-                    <Text className="text-purple-700 font-bold">-</Text>
+                    <Text className={`${locked ? 'text-gray-400' : 'text-purple-700'} font-bold`}>-</Text>
                   </Pressable>
                   <Text className="text-sm font-medium w-6 text-center">{item.quantity}</Text>
                   <Pressable
-                    className="w-7 h-7 rounded-full bg-purple-50 items-center justify-center"
+                    className={`w-7 h-7 rounded-full items-center justify-center ${locked ? 'bg-gray-100' : 'bg-purple-50'}`}
                     onPress={() => onUpdateQty(item.menuId, item.quantity + 1)}
+                    disabled={locked}
                   >
-                    <Text className="text-purple-700 font-bold">+</Text>
+                    <Text className={`${locked ? 'text-gray-400' : 'text-purple-700'} font-bold`}>+</Text>
                   </Pressable>
                 </View>
                 <Text className="text-sm font-semibold text-mekha-text ml-3 w-16 text-right">
@@ -500,6 +509,13 @@ function CartPanel({
           </ScrollView>
 
           <View className="pt-4 border-t border-mekha-border mt-2">
+            {locked && (
+              <View className="bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 mb-3">
+                <Text className="text-xs text-amber-700 text-center">
+                  เริ่มรับชำระเงินแล้ว แก้ไขรายการอาหารไม่ได้
+                </Text>
+              </View>
+            )}
             <View className="flex-row justify-between mb-3">
               <Text className="text-base font-bold text-mekha-text">รวม</Text>
               <Text className="text-base font-bold text-purple-600">฿{total.toFixed(0)}</Text>

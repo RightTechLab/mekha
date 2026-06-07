@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { CartItem, Discount } from '../../types';
+import type { CartItem, CheckoutSession, Discount } from '../../types';
 
 interface TableCart {
   items: CartItem[];
@@ -14,6 +14,7 @@ interface CartStore {
   tableId: string | null;
   tableName: string | null;
   tableCarts: Record<string, TableCart>;
+  checkoutSessions: Record<string, CheckoutSession>;
   addItem: (item: CartItem) => void;
   removeItem: (menuId: string) => void;
   updateQty: (menuId: string, qty: number) => void;
@@ -24,6 +25,10 @@ interface CartStore {
   getSubtotal: () => number;
   getTotal: () => number;
   getTableItemCount: (tableId: string | null) => number;
+  saveCheckoutSession: (session: CheckoutSession) => void;
+  getCheckoutSession: (tableId?: string | null) => CheckoutSession | null;
+  clearCheckoutSession: (tableId?: string | null) => void;
+  hasActiveCheckoutSession: (tableId?: string | null) => boolean;
 }
 
 export const useCartStore = create<CartStore>((set, get) => ({
@@ -32,6 +37,7 @@ export const useCartStore = create<CartStore>((set, get) => ({
   tableId: null,
   tableName: null,
   tableCarts: {},
+  checkoutSessions: {},
 
   addItem: (item) =>
     set((state) => {
@@ -60,6 +66,7 @@ export const useCartStore = create<CartStore>((set, get) => ({
       }
       // Sync to tableCarts
       const key = state.tableId ?? NO_TABLE;
+      if (state.checkoutSessions[key]) return state;
       return {
         items: newItems,
         tableCarts: {
@@ -73,6 +80,7 @@ export const useCartStore = create<CartStore>((set, get) => ({
     set((state) => {
       const newItems = state.items.filter((i) => i.menuId !== menuId);
       const key = state.tableId ?? NO_TABLE;
+      if (state.checkoutSessions[key]) return state;
       return {
         items: newItems,
         tableCarts: {
@@ -84,6 +92,9 @@ export const useCartStore = create<CartStore>((set, get) => ({
 
   updateQty: (menuId, qty) =>
     set((state) => {
+      const key = state.tableId ?? NO_TABLE;
+      if (state.checkoutSessions[key]) return state;
+
       const newItems =
         qty <= 0
           ? state.items.filter((i) => i.menuId !== menuId)
@@ -98,7 +109,6 @@ export const useCartStore = create<CartStore>((set, get) => ({
                   }
                 : i
             );
-      const key = state.tableId ?? NO_TABLE;
       return {
         items: newItems,
         tableCarts: {
@@ -146,12 +156,14 @@ export const useCartStore = create<CartStore>((set, get) => ({
     set((state) => {
       const key = state.tableId ?? NO_TABLE;
       const { [key]: _, ...rest } = state.tableCarts;
+      const { [key]: __, ...restSessions } = state.checkoutSessions;
       return {
         items: [],
         discount: null,
         tableId: null,
         tableName: null,
         tableCarts: rest,
+        checkoutSessions: restSessions,
       };
     }),
 
@@ -179,5 +191,36 @@ export const useCartStore = create<CartStore>((set, get) => ({
     const cart = state.tableCarts[key];
     if (!cart) return 0;
     return cart.items.reduce((sum, i) => sum + i.quantity, 0);
+  },
+
+  saveCheckoutSession: (session) =>
+    set((state) => {
+      const key = state.tableId ?? NO_TABLE;
+      return {
+        checkoutSessions: {
+          ...state.checkoutSessions,
+          [key]: session,
+        },
+      };
+    }),
+
+  getCheckoutSession: (tableId) => {
+    const state = get();
+    const key = tableId ?? state.tableId ?? NO_TABLE;
+    return state.checkoutSessions[key] ?? null;
+  },
+
+  clearCheckoutSession: (tableId) =>
+    set((state) => {
+      const key = tableId ?? state.tableId ?? NO_TABLE;
+      const { [key]: _, ...rest } = state.checkoutSessions;
+      return { checkoutSessions: rest };
+    }),
+
+  hasActiveCheckoutSession: (tableId) => {
+    const state = get();
+    const key = tableId ?? state.tableId ?? NO_TABLE;
+    const session = state.checkoutSessions[key];
+    return !!session && session.paidSplits.length > 0;
   },
 }));

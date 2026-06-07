@@ -78,6 +78,29 @@ export interface Transaction {
   created_at: string;
 }
 
+export interface CheckoutSplitRecord {
+  label: string;
+  amount: number;
+  method: PaymentMethod;
+  status: 'pending' | 'completed';
+  amountSat: number | null;
+  btcRate: number | null;
+  invoice: string | null;
+  verifyUrl: string | null;
+  qrRef: string | null;
+  serial: number | null;
+  transactionId: string | null;
+  unitIndices: number[];
+}
+
+export interface CheckoutSession {
+  orderId: string | null;
+  paidSplits: CheckoutSplitRecord[];
+  splitMode: 'none' | 'equal' | 'items';
+  customerCount: number;
+  paidUnitIndices: number[];
+}
+
 export interface AuditLog {
   id: string;
   entity_type: 'transaction' | 'order';
