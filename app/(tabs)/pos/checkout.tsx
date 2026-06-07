@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import { View, Text, Pressable, ScrollView, ActivityIndicator, TextInput, Alert, useWindowDimensions } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { router } from 'expo-router';
+import { useFocusEffect } from '@react-navigation/native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -19,6 +20,7 @@ import {
   completeTransaction,
   createTransaction,
   getNextSerial,
+  getTransactionById,
   updatePendingTransactionMethod,
 } from '../../../src/db/repositories/transactionRepo';
 import { getSetting } from '../../../src/db/repositories/transactionRepo';
@@ -363,6 +365,38 @@ export default function CheckoutScreen() {
       return false;
     },
     [finalTotal, tableId, clear, vatIncluded, lnInvoice, lnVerifyUrl, qrData, role]
+  );
+
+  useFocusEffect(
+    useCallback(() => {
+      if (step === 'done' || paidSplits.length === 0) return;
+
+      let changed = false;
+      const syncedSplits = paidSplits.map((split) => {
+        if (!split.transactionId) return split;
+        const txn = getTransactionById(split.transactionId);
+        if (!txn || txn.status !== 'completed' || split.status === 'completed') return split;
+        changed = true;
+        return {
+          ...split,
+          status: 'completed' as const,
+          method: txn.payment_method,
+          amountSat: txn.amount_sat,
+          btcRate: txn.btc_rate_thb,
+          invoice: txn.lightning_invoice,
+          verifyUrl: txn.lightning_verify_url,
+          qrRef: txn.promptpay_ref,
+          serial: txn.serial_number,
+        };
+      });
+
+      if (!changed) return;
+
+      setPaidSplits(syncedSplits);
+      setActivePendingIndex(null);
+      setStep('summary');
+      void closeOrderIfReady(syncedSplits);
+    }, [step, paidSplits, closeOrderIfReady])
   );
 
   const handleSplitModeChange = (mode: SplitMode) => {
