@@ -398,6 +398,24 @@ function TransactionCard({ txn, onChanged }: { txn: Transaction; onChanged: () =
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     Alert.alert('คัดลอกแล้ว', 'Invoice ถูกคัดลอกเรียบร้อย');
   };
+  const showQrForTransaction = async (target: Transaction) => {
+    setQrTxn(target);
+    if (target.payment_method === 'promptpay') {
+      if (target.promptpay_ref) {
+        setQrData(target.promptpay_ref);
+        setShowQr(true);
+        return;
+      }
+      const promptpayId = await SecureStore.getItemAsync('mekha.promptpay_id');
+      if (promptpayId) {
+        setQrData(generatePromptPayQR(promptpayId, target.amount_thb));
+        setShowQr(true);
+      }
+    } else if (target.payment_method === 'lightning' && target.lightning_invoice) {
+      setQrData(target.lightning_invoice);
+      setShowQr(true);
+    }
+  };
 
   return (
     <Pressable
@@ -443,22 +461,46 @@ function TransactionCard({ txn, onChanged }: { txn: Transaction; onChanged: () =
         <View className="mt-3 pt-3 border-t border-mekha-border">
           <Text className="text-xs font-semibold text-mekha-text mb-2">การชำระเงิน ({splitTxns.length} รายการ)</Text>
           {splitTxns.map((st) => (
-            <View key={st.id} className="flex-row justify-between gap-2 py-1">
-              <View className="flex-1">
-                <Text className="text-xs text-mekha-text">
-                  {METHOD_LABELS[st.payment_method] ?? st.payment_method}
-                  {st.serial_number && st.payment_method !== 'cash' ? ` #${String(st.serial_number).padStart(4, '0')}` : ''}
-                </Text>
-                {st.status !== 'completed' && (
-                  <Text className={`text-[10px] ${STATUS_COLORS[st.status]?.split(' ')[1] ?? 'text-gray-600'}`}>
-                    {STATUS_LABELS[st.status] ?? st.status}
+            <View key={st.id} className="py-2 border-b border-mekha-border/60">
+              <View className="flex-row justify-between gap-2">
+                <View className="flex-1">
+                  <Text className="text-xs text-mekha-text">
+                    {METHOD_LABELS[st.payment_method] ?? st.payment_method}
+                    {st.serial_number && st.payment_method !== 'cash' ? ` #${String(st.serial_number).padStart(4, '0')}` : ''}
                   </Text>
-                )}
+                  {st.status !== 'completed' && (
+                    <Text className={`text-[10px] ${STATUS_COLORS[st.status]?.split(' ')[1] ?? 'text-gray-600'}`}>
+                      {STATUS_LABELS[st.status] ?? st.status}
+                    </Text>
+                  )}
+                </View>
+                <Text className="text-xs font-medium text-mekha-text">
+                  ฿{st.amount_thb.toFixed(2)}
+                </Text>
               </View>
-              <Text className="text-xs font-medium text-mekha-text">
-                ฿{st.amount_thb.toFixed(2)}
-              </Text>
-            </View>
+              {(st.payment_method === 'promptpay' || st.payment_method === 'lightning') && !['cancelled', 'voided', 'refunded'].includes(st.status) && (
+                <Pressable
+                  className="bg-purple-50 py-2 rounded-xl items-center mt-2"
+                  onPress={async (e) => {
+                    e.stopPropagation?.();
+                    await showQrForTransaction(st);
+                  }}
+                >
+                  <Text className="text-sm font-medium text-purple-700">
+                    {formatPaymentId(st)} QR {METHOD_LABELS[st.payment_method]} ฿{st.amount_thb.toFixed(2)}
+                  </Text>
+                </Pressable>
+              )}
+              {st.status === 'pending' && (
+                <PendingActions
+                  txn={st}
+                  onConfirm={handleConfirmPending}
+                  onCancel={handleCancelPending}
+                  onCheckLightning={handleCheckLightning}
+                  onSwitchMethod={handleSwitchMethod}
+                />
+              )}
+              </View>
           ))}
           <View className="flex-row justify-between mt-1 pt-1 border-t border-mekha-border">
             <Text className="text-xs font-semibold text-mekha-text">ยอดรวม</Text>
@@ -488,22 +530,7 @@ function TransactionCard({ txn, onChanged }: { txn: Transaction; onChanged: () =
           className="mt-3 bg-purple-50 py-2 rounded-xl items-center"
           onPress={async (e) => {
             e.stopPropagation?.();
-            setQrTxn(txn);
-            if (txn.payment_method === 'promptpay') {
-              if (txn.promptpay_ref) {
-                setQrData(txn.promptpay_ref);
-                setShowQr(true);
-              } else {
-                const promptpayId = await SecureStore.getItemAsync('mekha.promptpay_id');
-                if (promptpayId) {
-                  setQrData(generatePromptPayQR(promptpayId, txn.amount_thb));
-                  setShowQr(true);
-                }
-              }
-            } else if (txn.payment_method === 'lightning' && txn.lightning_invoice) {
-              setQrData(txn.lightning_invoice);
-              setShowQr(true);
-            }
+            await showQrForTransaction(txn);
           }}
         >
           <Text className="text-sm font-medium text-purple-700">
@@ -519,53 +546,6 @@ function TransactionCard({ txn, onChanged }: { txn: Transaction; onChanged: () =
           onCheckLightning={handleCheckLightning}
           onSwitchMethod={handleSwitchMethod}
         />
-      )}
-      {expanded && isSplitGroup && splitTxns.filter((st) => (st.payment_method === 'promptpay' || st.payment_method === 'lightning') && !['cancelled', 'voided', 'refunded'].includes(st.status)).length > 0 && (
-        <View className="mt-3">
-          {splitTxns.filter((st) => (st.payment_method === 'promptpay' || st.payment_method === 'lightning') && !['cancelled', 'voided', 'refunded'].includes(st.status)).map((st) => (
-            <Pressable
-              key={st.id}
-              className="bg-purple-50 py-2 rounded-xl items-center mb-1"
-              onPress={async (e) => {
-                e.stopPropagation?.();
-                setQrTxn(st);
-                if (st.payment_method === 'promptpay') {
-                  if (st.promptpay_ref) {
-                    setQrData(st.promptpay_ref);
-                    setShowQr(true);
-                  } else {
-                    const promptpayId = await SecureStore.getItemAsync('mekha.promptpay_id');
-                    if (promptpayId) {
-                      setQrData(generatePromptPayQR(promptpayId, st.amount_thb));
-                      setShowQr(true);
-                    }
-                  }
-                } else if (st.payment_method === 'lightning' && st.lightning_invoice) {
-                  setQrData(st.lightning_invoice);
-                  setShowQr(true);
-                }
-              }}
-            >
-              <Text className="text-sm font-medium text-purple-700">
-                {formatPaymentId(st)} QR {METHOD_LABELS[st.payment_method]} ฿{st.amount_thb.toFixed(2)}
-              </Text>
-            </Pressable>
-          ))}
-        </View>
-      )}
-      {expanded && isSplitGroup && splitTxns.some((st) => st.status === 'pending') && (
-        <View className="mt-2">
-          {splitTxns.filter((st) => st.status === 'pending').map((st) => (
-            <PendingActions
-              key={`pending-${st.id}`}
-              txn={st}
-              onConfirm={handleConfirmPending}
-              onCancel={handleCancelPending}
-              onCheckLightning={handleCheckLightning}
-              onSwitchMethod={handleSwitchMethod}
-            />
-          ))}
-        </View>
       )}
       {showQr && (
         <Modal visible={showQr} animationType="fade" transparent>
@@ -695,6 +675,9 @@ function PendingActions({
       >
         <Text className="text-sm font-medium text-red-700">ยกเลิกรายการรอชำระ</Text>
       </Pressable>
+      <Text className="text-[10px] text-mekha-muted text-center">
+        ใช้เมื่อ QR ผิด ลูกค้าเปลี่ยนวิธีจ่าย หรือไม่ต้องการค้างรายการนี้ไว้
+      </Text>
     </View>
   );
 }
