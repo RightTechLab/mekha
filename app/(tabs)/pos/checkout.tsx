@@ -951,7 +951,10 @@ export default function CheckoutScreen() {
   }, [lnAutoConfirmed]);
 
   const handleSuccessHistory = () => {
-    router.dismissTo('/(tabs)/transactions');
+    router.dismissAll();
+    setTimeout(() => {
+      router.navigate('/(tabs)/transactions');
+    }, 0);
   };
 
   const handleSuccessBack = () => {
