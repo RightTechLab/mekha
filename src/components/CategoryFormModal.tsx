@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { View, Text, Pressable, TextInput, ScrollView, Alert, Modal, KeyboardAvoidingView, Platform, TouchableWithoutFeedback } from 'react-native';
+import { View, Text, Pressable, TextInput, ScrollView, Alert, Modal, KeyboardAvoidingView, Platform, TouchableWithoutFeedback, Keyboard } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import * as Crypto from 'expo-crypto';
@@ -21,6 +21,7 @@ export default function CategoryFormModal({ visible, onClose, onSaved }: Props) 
   const insets = useSafeAreaInsets();
   const [categories, setCategories] = useState<CategoryItem[]>([]);
   const [newCatName, setNewCatName] = useState('');
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
 
   useEffect(() => {
     if (visible) {
@@ -28,6 +29,20 @@ export default function CategoryFormModal({ visible, onClose, onSaved }: Props) 
       setNewCatName('');
     }
   }, [visible]);
+
+  useEffect(() => {
+    const showSub = Keyboard.addListener('keyboardDidShow', (event) => {
+      setKeyboardHeight(event.endCoordinates.height);
+    });
+    const hideSub = Keyboard.addListener('keyboardDidHide', () => {
+      setKeyboardHeight(0);
+    });
+
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
 
   const handleAdd = () => {
     if (!newCatName.trim()) return;
@@ -73,7 +88,7 @@ export default function CategoryFormModal({ visible, onClose, onSaved }: Props) 
   }, [visible]);
 
   const sheetStyle = useAnimatedStyle(() => ({
-    transform: [{ translateY: translateY.value }],
+    transform: [{ translateY: translateY.value - (Platform.OS === 'android' ? keyboardHeight : 0) }],
   }));
 
   const overlayStyle = useAnimatedStyle(() => ({
@@ -105,7 +120,7 @@ export default function CategoryFormModal({ visible, onClose, onSaved }: Props) 
 
             <ScrollView
               className="px-5 py-4"
-              contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}
+              contentContainerStyle={{ paddingBottom: insets.bottom + 24 + (Platform.OS === 'android' ? keyboardHeight : 0) }}
               showsVerticalScrollIndicator={false}
               keyboardShouldPersistTaps="handled"
             >
