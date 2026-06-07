@@ -950,6 +950,14 @@ export default function CheckoutScreen() {
     }
   }, [lnAutoConfirmed]);
 
+  const handleSuccessHistory = () => {
+    router.dismissTo('/(tabs)/transactions');
+  };
+
+  const handleSuccessBack = () => {
+    router.dismissTo('/(tabs)/pos');
+  };
+
   if (step === 'done' && successData) {
     return (
       <SafeAreaView className="flex-1 bg-white px-6 pt-10">
@@ -984,13 +992,13 @@ export default function CheckoutScreen() {
           <View className="w-full flex-row gap-2">
             <Pressable
               className="flex-1 py-4 rounded-2xl items-center border border-purple-600"
-              onPress={() => router.replace('/(tabs)/transactions')}
+              onPress={handleSuccessHistory}
             >
               <Text className="text-purple-700 font-semibold">ดูประวัติ</Text>
             </Pressable>
             <Pressable
               className="flex-1 py-4 rounded-2xl items-center bg-purple-600"
-              onPress={() => router.back()}
+              onPress={handleSuccessBack}
             >
               <Text className="text-white font-semibold">ย้อนกลับ</Text>
             </Pressable>
