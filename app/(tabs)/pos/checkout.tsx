@@ -614,12 +614,22 @@ export default function CheckoutScreen() {
 
       const newAllocated = newSplits.reduce((sum, s) => sum + s.amount, 0);
       if (newAllocated >= finalTotal - 0.01) {
-      setStep('summary');
+        for (const split of newSplits) {
+          if (split.status === 'completed' && !split.transactionId) {
+            persistCompletedSplit(orderId, split);
+          }
+        }
+        if (tableId) {
+          clearTable(tableId);
+        }
+        setSuccessData({ total: finalTotal, splits: newSplits, hasPending: true });
+        clear();
+        setStep('done');
       } else {
         setStep('summary');
       }
     },
-    [paidSplits, splitMode, selectedUnitIndices, expandedUnits, paidUnitIndices, finalTotal, lnInvoice, lnVerifyUrl, qrData, currentSerial, vatIncluded, role, clear]
+    [paidSplits, splitMode, selectedUnitIndices, expandedUnits, paidUnitIndices, finalTotal, lnInvoice, lnVerifyUrl, qrData, currentSerial, vatIncluded, role, tableId, clear]
   );
 
   const completeOrder = useCallback(
@@ -965,13 +975,23 @@ export default function CheckoutScreen() {
     return (
       <SafeAreaView className="flex-1 bg-white px-6 pt-10">
         <View className="flex-1 items-center justify-center">
-          <Text className="text-xl font-semibold text-mekha-text">บันทึกบิลแล้ว</Text>
+          <Text className="text-xl font-semibold text-mekha-text">
+            {successData.hasPending ? 'รอการชำระเงิน' : 'บันทึกบิลแล้ว'}
+          </Text>
           <Text className="text-3xl font-bold text-purple-600 mt-2">฿{successData.total.toFixed(2)}</Text>
-          <View className="w-20 h-20 rounded-3xl bg-green-500 items-center justify-center mt-6 mb-6">
-            <Ionicons name="checkmark" size={52} color="white" />
+          <View className={`w-20 h-20 rounded-3xl items-center justify-center mt-6 mb-6 ${
+            successData.hasPending ? 'bg-gray-200 border-4 border-gray-500' : 'bg-green-500'
+          }`}>
+            <Ionicons
+              name={successData.hasPending ? 'time-outline' : 'checkmark'}
+              size={successData.hasPending ? 48 : 52}
+              color={successData.hasPending ? '#6B7280' : 'white'}
+            />
           </View>
           <Text className="text-mekha-muted text-center mb-6">
-            ทุกรายการชำระเงินได้รับการยืนยันแล้ว
+            {successData.hasPending
+              ? 'บางรายการชำระเงินยังรอการยืนยัน\nปรับเปลี่ยนจัดการได้ในหน้าประวัติธุรกรรม'
+              : 'ทุกรายการชำระเงินได้รับการยืนยันแล้ว'}
           </Text>
 
           <View className="w-full border-t border-mekha-border pt-4 mb-6">
@@ -985,7 +1005,9 @@ export default function CheckoutScreen() {
                     {split.serial != null ? `#${String(split.serial).padStart(4, '0')} ` : ''}
                     {PAYMENT_LABELS[split.method]}
                   </Text>
-                  <Text className="text-xs text-green-700 mt-1">ชำระแล้ว</Text>
+                  <Text className={`text-xs mt-1 ${split.status === 'pending' ? 'text-amber-700' : 'text-green-700'}`}>
+                    {split.status === 'pending' ? 'รอชำระ' : 'ชำระแล้ว'}
+                  </Text>
                 </View>
                 <Text className="text-sm font-bold text-purple-700">฿{split.amount.toFixed(2)}</Text>
               </View>
