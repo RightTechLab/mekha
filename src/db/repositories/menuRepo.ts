@@ -137,6 +137,20 @@ export function getAllCategories(): CategoryItem[] {
   );
 }
 
+export function getCategoryMenuCounts(): Record<string, number> {
+  const rows = db.getAllSync<{ category: string; count: number }>(
+    `SELECT TRIM(category) as category, COUNT(*) as count
+     FROM menus
+     WHERE is_active = 1 AND category IS NOT NULL AND TRIM(category) != ''
+     GROUP BY TRIM(category)`
+  );
+
+  return rows.reduce<Record<string, number>>((counts, row) => {
+    counts[row.category.trim().toLowerCase()] = row.count;
+    return counts;
+  }, {});
+}
+
 export function createCategory(cat: Omit<CategoryItem, 'created_at'>): void {
   const existing = db.getFirstSync<{ id: string }>(
     'SELECT id FROM categories WHERE lower(name) = lower(?)',

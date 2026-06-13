@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react';
 import { View, Text, Pressable, TextInput, ScrollView, Alert, Modal, KeyboardAvoidingView, Platform, TouchableWithoutFeedback, Keyboard } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import * as Crypto from 'expo-crypto';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming, runOnJS } from 'react-native-reanimated';
 import {
   getAllCategories,
+  getCategoryMenuCounts,
   createCategory,
   deleteCategory,
 } from '../db/repositories/menuRepo';
@@ -17,16 +19,32 @@ interface Props {
   onSaved: () => void;
 }
 
+type CategoryWithUsage = CategoryItem & { menuCount: number };
+
 export default function CategoryFormModal({ visible, onClose, onSaved }: Props) {
   const insets = useSafeAreaInsets();
-  const [categories, setCategories] = useState<CategoryItem[]>([]);
+  const [categories, setCategories] = useState<CategoryWithUsage[]>([]);
   const [newCatName, setNewCatName] = useState('');
+  const [isEditing, setIsEditing] = useState(false);
+  const [selectedCategoryIds, setSelectedCategoryIds] = useState<string[]>([]);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
+
+  const loadCategories = () => {
+    const counts = getCategoryMenuCounts();
+    setCategories(
+      getAllCategories().map((cat) => ({
+        ...cat,
+        menuCount: counts[cat.name.trim().toLowerCase()] ?? 0,
+      }))
+    );
+  };
 
   useEffect(() => {
     if (visible) {
-      setCategories(getAllCategories());
+      loadCategories();
       setNewCatName('');
+      setIsEditing(false);
+      setSelectedCategoryIds([]);
     }
   }, [visible]);
 
@@ -54,20 +72,42 @@ export default function CategoryFormModal({ visible, onClose, onSaved }: Props) 
     });
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setNewCatName('');
-    setCategories(getAllCategories());
+    loadCategories();
     onSaved();
   };
 
-  const handleDelete = (id: string, name: string) => {
-    Alert.alert('ลบหมวดหมู่', `ต้องการลบ "${name}" หรือไม่?`, [
+  const toggleEditMode = () => {
+    setIsEditing((current) => {
+      if (current) {
+        setSelectedCategoryIds([]);
+      }
+      return !current;
+    });
+  };
+
+  const toggleSelected = (id: string) => {
+    const category = categories.find((cat) => cat.id === id);
+    if (!category || category.menuCount > 0) return;
+
+    setSelectedCategoryIds((current) =>
+      current.includes(id) ? current.filter((catId) => catId !== id) : [...current, id]
+    );
+  };
+
+  const handleDeleteSelected = () => {
+    if (selectedCategoryIds.length === 0) return;
+
+    Alert.alert('ลบหมวดหมู่', `ต้องการลบ ${selectedCategoryIds.length} หมวดหมู่ที่เลือกหรือไม่?`, [
       { text: 'ยกเลิก', style: 'cancel' },
       {
         text: 'ลบ',
         style: 'destructive',
         onPress: () => {
-          deleteCategory(id);
+          selectedCategoryIds.forEach((id) => deleteCategory(id));
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-          setCategories(getAllCategories());
+          loadCategories();
+          setSelectedCategoryIds([]);
+          setIsEditing(false);
           onSaved();
         },
       },
@@ -88,7 +128,7 @@ export default function CategoryFormModal({ visible, onClose, onSaved }: Props) 
   }, [visible]);
 
   const sheetStyle = useAnimatedStyle(() => ({
-    transform: [{ translateY: translateY.value - (Platform.OS === 'android' ? keyboardHeight : 0) }],
+    transform: [{ translateY: translateY.value }],
   }));
 
   const overlayStyle = useAnimatedStyle(() => ({
@@ -113,14 +153,21 @@ export default function CategoryFormModal({ visible, onClose, onSaved }: Props) 
             {/* Header */}
             <View className="px-5 pt-5 pb-3 border-b border-mekha-border flex-row items-center justify-between">
               <Text className="text-xl font-bold text-mekha-text">จัดการหมวดหมู่</Text>
-              <Pressable onPress={handleDismiss} className="p-2">
-                <Text className="text-mekha-muted text-lg">✕</Text>
-              </Pressable>
+              <View className="flex-row items-center gap-2">
+                {categories.length > 0 ? (
+                  <Pressable onPress={toggleEditMode} className="px-3 py-2 rounded-lg bg-mekha-surface">
+                    <Text className="text-purple-700 font-medium text-sm">{isEditing ? 'เสร็จ' : 'แก้ไข'}</Text>
+                  </Pressable>
+                ) : null}
+                <Pressable onPress={handleDismiss} className="p-2">
+                  <Ionicons name="close" size={22} color="#6B7280" />
+                </Pressable>
+              </View>
             </View>
 
             <ScrollView
               className="px-5 py-4"
-              contentContainerStyle={{ paddingBottom: insets.bottom + 24 + (Platform.OS === 'android' ? keyboardHeight : 0) }}
+              contentContainerStyle={{ paddingBottom: insets.bottom + 24 + (keyboardHeight > 0 ? 120 : 0) }}
               showsVerticalScrollIndicator={false}
               keyboardShouldPersistTaps="handled"
             >
@@ -147,18 +194,38 @@ export default function CategoryFormModal({ visible, onClose, onSaved }: Props) 
               {categories.length > 0 ? (
                 <View className="bg-mekha-surface border border-mekha-border rounded-xl overflow-hidden">
                   {categories.map((cat, idx) => (
-                    <View
+                    <Pressable
                       key={cat.id}
-                      className={`flex-row items-center justify-between px-4 py-3.5 ${idx < categories.length - 1 ? 'border-b border-mekha-border' : ''}`}
+                      className={`flex-row items-center justify-between px-4 py-3.5 ${idx < categories.length - 1 ? 'border-b border-mekha-border' : ''} ${isEditing && cat.menuCount > 0 ? 'opacity-60' : ''}`}
+                      onPress={() => {
+                        if (isEditing) toggleSelected(cat.id);
+                      }}
+                      disabled={!isEditing || cat.menuCount > 0}
                     >
-                      <Text className="text-base font-medium text-mekha-text">{cat.name}</Text>
-                      <Pressable
-                        className="bg-red-50 px-3 py-1.5 rounded-lg"
-                        onPress={() => handleDelete(cat.id, cat.name)}
-                      >
-                        <Text className="text-red-700 text-xs font-medium">ลบ</Text>
-                      </Pressable>
-                    </View>
+                      <View className="flex-row items-center gap-3 flex-1">
+                        {isEditing ? (
+                          <View
+                            className={`w-6 h-6 rounded-full border items-center justify-center ${
+                              selectedCategoryIds.includes(cat.id) ? 'bg-red-600 border-red-600' : 'border-mekha-border'
+                            }`}
+                          >
+                            {selectedCategoryIds.includes(cat.id) ? (
+                              <Ionicons name="checkmark" size={16} color="#FFFFFF" />
+                            ) : cat.menuCount > 0 ? (
+                              <Ionicons name="lock-closed" size={13} color="#9CA3AF" />
+                            ) : null}
+                          </View>
+                        ) : null}
+                        <View className="flex-1">
+                          <Text className="text-base font-medium text-mekha-text">{cat.name}</Text>
+                          {isEditing && cat.menuCount > 0 ? (
+                            <Text className="text-xs text-mekha-muted mt-0.5">
+                              มีอาหาร {cat.menuCount} รายการ กรุณาลบหรือย้ายอาหารก่อน
+                            </Text>
+                          ) : null}
+                        </View>
+                      </View>
+                    </Pressable>
                   ))}
                 </View>
               ) : (
@@ -167,6 +234,20 @@ export default function CategoryFormModal({ visible, onClose, onSaved }: Props) 
                 </View>
               )}
             </ScrollView>
+
+            {isEditing ? (
+              <View className="px-5 pt-3 border-t border-mekha-border bg-white" style={{ paddingBottom: insets.bottom + 12 }}>
+                <Pressable
+                  className={`rounded-xl py-3.5 items-center ${selectedCategoryIds.length > 0 ? 'bg-red-600' : 'bg-gray-200'}`}
+                  onPress={handleDeleteSelected}
+                  disabled={selectedCategoryIds.length === 0}
+                >
+                  <Text className={`font-semibold ${selectedCategoryIds.length > 0 ? 'text-white' : 'text-gray-500'}`}>
+                    ลบที่เลือก ({selectedCategoryIds.length})
+                  </Text>
+                </Pressable>
+              </View>
+            ) : null}
           </Animated.View>
         </View>
       </KeyboardAvoidingView>
