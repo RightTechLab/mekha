@@ -44,10 +44,10 @@ export default function MenuScreen() {
   }, []);
 
   const handleDelete = useCallback((id: string, menuName: string) => {
-    Alert.alert('ซ่อนเมนูจากหน้าขาย', `ต้องการซ่อน "${menuName}" หรือไม่?\nประวัติการขายเดิมจะยังอยู่`, [
+    Alert.alert('ปิดใช้งานเมนู', `ต้องการปิดใช้งาน "${menuName}" หรือไม่?\nเมนูจะหายจากหน้าขาย แต่ประวัติการขายเดิมจะยังอยู่`, [
       { text: 'ยกเลิก', style: 'cancel' },
       {
-        text: 'ซ่อนเมนู',
+        text: 'ปิดใช้งาน',
         style: 'destructive',
         onPress: () => {
           deleteMenu(id);
