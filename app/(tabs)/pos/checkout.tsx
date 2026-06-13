@@ -21,6 +21,7 @@ import {
   createTransaction,
   getNextSerial,
   getTransactionById,
+  updateTransactionStatus,
   updatePendingTransactionMethod,
 } from '../../../src/db/repositories/transactionRepo';
 import { getSetting } from '../../../src/db/repositories/transactionRepo';
@@ -946,6 +947,51 @@ export default function CheckoutScreen() {
     [paidSplits, switchPendingSplitMethod]
   );
 
+  const handleCheckLightning = useCallback(async () => {
+    if (!lnVerifyUrl) {
+      Alert.alert('ตรวจสอบไม่ได้', 'รายการนี้ไม่มี verify URL');
+      return;
+    }
+
+    const status = await checkVerifyUrl(lnVerifyUrl);
+    if (status === 'settled') {
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      if (activePendingIndex != null) {
+        await confirmPendingSplit(activePendingIndex);
+      } else if (splitMode !== 'none') {
+        recordSplitPayment('lightning', { amountSat: lnAmountSat, btcRate: lnRate });
+      } else {
+        completeOrder('lightning', { amountSat: lnAmountSat, btcRate: lnRate });
+      }
+      Alert.alert('จ่ายแล้ว', 'ตรวจพบการชำระเงิน Lightning แล้ว');
+      return;
+    }
+
+    const expiryMs = lnInvoice ? parseInvoiceExpiry(lnInvoice) : null;
+    if (expiryMs && Date.now() > expiryMs) {
+      if (activePendingSplit?.transactionId) {
+        updateTransactionStatus(activePendingSplit.transactionId, 'expired');
+      }
+      setLnExpired(true);
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      Alert.alert('หมดอายุแล้ว', 'Invoice นี้หมดอายุแล้ว');
+      return;
+    }
+
+    Alert.alert('ยังไม่พบการชำระ', 'ยังตรวจไม่พบการจ่าย Lightning รายการนี้');
+  }, [
+    lnVerifyUrl,
+    activePendingIndex,
+    activePendingSplit,
+    splitMode,
+    lnAmountSat,
+    lnRate,
+    lnInvoice,
+    confirmPendingSplit,
+    recordSplitPayment,
+    completeOrder,
+  ]);
+
   // Auto-confirm Lightning payment when verify URL reports settled
   useEffect(() => {
     if (lnAutoConfirmed && lnInvoice) {
@@ -1201,9 +1247,16 @@ export default function CheckoutScreen() {
               </View>
             ) : null}
             {lnVerifyUrl ? (
-              <View className="flex-row items-center gap-2 mb-4">
-                <ActivityIndicator size="small" color="#7C3AED" />
-                <Text className="text-purple-700 text-sm font-medium">รอการยืนยันอัตโนมัติ...</Text>
+              <View className="w-full mb-4">
+                <Pressable
+                  className="w-full py-3 rounded-xl items-center bg-amber-50 border border-amber-200"
+                  onPress={handleCheckLightning}
+                >
+                  <Text className="text-amber-700 font-semibold">ตรวจสอบ Lightning</Text>
+                </Pressable>
+                <Text className="text-mekha-muted text-xs text-center mt-2">
+                  กดตรวจสอบหลังลูกค้าชำระเงินแล้ว
+                </Text>
               </View>
             ) : (
               <Text className="text-mekha-muted text-center text-sm mb-4">
