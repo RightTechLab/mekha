@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { View, Text, Pressable, ScrollView, Modal, TouchableWithoutFeedback, Alert } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
@@ -8,13 +8,22 @@ import * as SecureStore from 'expo-secure-store';
 import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
 import QRCode from 'react-native-qrcode-svg';
-import { completeTransaction, getTransactions, getTransactionsByOrderId, updateTransactionStatus } from '../../../src/db/repositories/transactionRepo';
+import {
+  completeTransaction,
+  getNextSerial,
+  getTransactions,
+  getTransactionsByOrderId,
+  updatePendingTransactionMethod,
+  updateTransactionStatus,
+} from '../../../src/db/repositories/transactionRepo';
 import { getOrderItems, updateOrderStatus } from '../../../src/db/repositories/orderRepo';
 import { useSessionStore } from '../../../src/features/auth/sessionStore';
 import { generatePromptPayQR } from '../../../src/lib/promptpay';
-import { checkVerifyUrl, parseInvoiceExpiry } from '../../../src/lib/lightning';
+import { checkVerifyUrl, parseInvoiceExpiry, pollInvoice } from '../../../src/lib/lightning';
+import { getBtcRateThb, thbToSats } from '../../../src/lib/exchangeRate';
+import { useLnurlCacheStore } from '../../../src/features/payment/lnurlCacheStore';
 import { formatBangkokDateTime, getBangkokDateKey } from '../../../src/lib/time';
-import type { Transaction, OrderItem } from '../../../src/types';
+import type { Transaction, OrderItem, PaymentMethod } from '../../../src/types';
 
 const METHOD_LABELS: Record<string, string> = {
   cash: 'เงินสด',
@@ -55,6 +64,17 @@ const PAYMENT_FILTERS: { label: string; value: string | null }[] = [
 ];
 
 const INACTIVE_STATUSES = ['cancelled', 'voided', 'refunded', 'expired'];
+const PAYMENT_TOTAL_STATUSES = ['completed'];
+
+function isInactiveStatus(status: string): boolean {
+  return INACTIVE_STATUSES.includes(status);
+}
+
+function sumTransactionsByStatus(transactions: Transaction[], statuses: string[]): number {
+  return transactions
+    .filter((t) => statuses.includes(t.status))
+    .reduce((sum, t) => sum + t.amount_thb, 0);
+}
 
 function formatCountdown(ms: number): string {
   const totalSeconds = Math.max(0, Math.ceil(ms / 1000));
@@ -104,8 +124,8 @@ export default function TransactionsScreen() {
   const totalFiltered = transactions.reduce((sum, t) => {
     const related = getTransactionsByOrderId(t.order_id);
     const orderTotal = related.length > 1
-      ? related.reduce((orderSum, relatedTxn) => orderSum + relatedTxn.amount_thb, 0)
-      : t.amount_thb;
+      ? sumTransactionsByStatus(related, PAYMENT_TOTAL_STATUSES)
+      : sumTransactionsByStatus([t], PAYMENT_TOTAL_STATUSES);
     return sum + orderTotal;
   }, 0);
 
@@ -186,8 +206,9 @@ export default function TransactionsScreen() {
 }
 
 function getOrderDisplayStatus(transactions: Transaction[]): string {
-  if (transactions.some((t) => t.status === 'pending')) return 'pending';
-  if (transactions.length > 0 && transactions.every((t) => t.status === 'completed')) return 'completed';
+  const active = transactions.filter((t) => !isInactiveStatus(t.status));
+  if (active.some((t) => t.status === 'pending')) return 'pending';
+  if (active.length > 0 && active.every((t) => t.status === 'completed')) return 'completed';
   if (transactions.some((t) => t.status === 'expired')) return 'expired';
   if (transactions.some((t) => t.status === 'voided')) return 'voided';
   if (transactions.some((t) => t.status === 'refunded')) return 'refunded';
@@ -203,6 +224,7 @@ function TransactionCard({ txn, onChanged }: { txn: Transaction; onChanged: () =
   const [qrData, setQrData] = useState('');
   const [qrTxn, setQrTxn] = useState<Transaction>(txn);
   const [qrNow, setQrNow] = useState(Date.now());
+  const qrPollCleanupRef = useRef<(() => void) | null>(null);
 
   // Load split info immediately on mount/recycle
   useEffect(() => {
@@ -220,6 +242,54 @@ function TransactionCard({ txn, onChanged }: { txn: Transaction; onChanged: () =
     return () => clearInterval(timer);
   }, [showQr, qrTxn.id, qrTxn.payment_method, qrTxn.lightning_invoice]);
 
+  useEffect(() => {
+    if (qrPollCleanupRef.current) {
+      qrPollCleanupRef.current();
+      qrPollCleanupRef.current = null;
+    }
+
+    if (
+      !showQr ||
+      qrTxn.status !== 'pending' ||
+      qrTxn.payment_method !== 'lightning' ||
+      !qrTxn.lightning_verify_url
+    ) {
+      return;
+    }
+
+    const expiryMs = qrTxn.lightning_invoice ? parseInvoiceExpiry(qrTxn.lightning_invoice) : null;
+    if (expiryMs && Date.now() >= expiryMs) {
+      updateTransactionStatus(qrTxn.id, 'expired');
+      refreshRelated();
+      setQrTxn((current) => ({ ...current, status: 'expired' }));
+      return;
+    }
+
+    qrPollCleanupRef.current = pollInvoice(
+      () => checkVerifyUrl(qrTxn.lightning_verify_url!),
+      () => {
+        completeTransaction(qrTxn.id);
+        settleOrderIfAllCompleted();
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        setQrTxn((current) => ({ ...current, status: 'completed' }));
+        refreshRelated();
+      },
+      () => {
+        updateTransactionStatus(qrTxn.id, 'expired');
+        setQrTxn((current) => ({ ...current, status: 'expired' }));
+        refreshRelated();
+      },
+      expiryMs ? expiryMs - Date.now() : 600_000
+    );
+
+    return () => {
+      if (qrPollCleanupRef.current) {
+        qrPollCleanupRef.current();
+        qrPollCleanupRef.current = null;
+      }
+    };
+  }, [showQr, qrTxn.id, qrTxn.status, qrTxn.payment_method, qrTxn.lightning_verify_url, qrTxn.lightning_invoice]);
+
   const toggleExpand = useCallback(() => {
     if (!expanded) {
       setItems(getOrderItems(txn.order_id));
@@ -230,7 +300,7 @@ function TransactionCard({ txn, onChanged }: { txn: Transaction; onChanged: () =
   const isSplitGroup = splitTxns.length > 1;
   const groupedTxns = isSplitGroup ? splitTxns : [txn];
   const orderTotal = isSplitGroup
-    ? splitTxns.reduce((sum, t) => sum + t.amount_thb, 0)
+    ? sumTransactionsByStatus(splitTxns, ['completed']) || sumTransactionsByStatus(splitTxns, ['pending'])
     : txn.amount_thb;
   const displayStatus = getOrderDisplayStatus(groupedTxns);
 
@@ -286,6 +356,103 @@ function TransactionCard({ txn, onChanged }: { txn: Transaction; onChanged: () =
       return;
     }
     Alert.alert('ยังไม่พบการชำระ', 'ยังตรวจไม่พบการจ่าย Lightning รายการนี้');
+  };
+  const switchPendingMethod = async (target: Transaction, method: PaymentMethod) => {
+    if (target.status !== 'pending' || method === target.payment_method) return;
+
+    try {
+      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
+      if (method === 'cash') {
+        updatePendingTransactionMethod(target.id, {
+          paymentMethod: 'cash',
+          amountSat: null,
+          btcRateThb: null,
+          lightningInvoice: null,
+          lightningVerifyUrl: null,
+          promptpayRef: null,
+          serialNumber: null,
+        });
+        setShowQr(false);
+        refreshRelated();
+        return;
+      }
+
+      const serial = getNextSerial();
+      if (method === 'promptpay') {
+        const promptpayId = await SecureStore.getItemAsync('mekha.promptpay_id');
+        if (!promptpayId) {
+          Alert.alert('ยังไม่ได้ตั้งค่า', 'กรุณาตั้งค่า PromptPay ID ในหน้าตั้งค่าก่อน');
+          return;
+        }
+        const qr = generatePromptPayQR(promptpayId, target.amount_thb);
+        updatePendingTransactionMethod(target.id, {
+          paymentMethod: 'promptpay',
+          amountSat: null,
+          btcRateThb: null,
+          lightningInvoice: null,
+          lightningVerifyUrl: null,
+          promptpayRef: qr,
+          serialNumber: serial,
+        });
+        setQrTxn({
+          ...target,
+          payment_method: 'promptpay',
+          promptpay_ref: qr,
+          serial_number: serial,
+          amount_sat: null,
+          btc_rate_thb: null,
+          lightning_invoice: null,
+          lightning_verify_url: null,
+        });
+        setQrData(qr);
+        setShowQr(true);
+        refreshRelated();
+        return;
+      }
+
+      const lnAddress = await SecureStore.getItemAsync('mekha.ln_address');
+      if (!lnAddress) {
+        Alert.alert('ยังไม่ได้ตั้งค่า', 'กรุณาตั้งค่า Lightning Address ในหน้าตั้งค่าก่อน');
+        return;
+      }
+      const rate = await getBtcRateThb();
+      const amountSat = thbToSats(target.amount_thb, rate);
+      const invoiceResult = await useLnurlCacheStore.getState().requestInvoiceWithCache(amountSat * 1000, lnAddress);
+      updatePendingTransactionMethod(target.id, {
+        paymentMethod: 'lightning',
+        amountSat,
+        btcRateThb: rate,
+        lightningInvoice: invoiceResult.pr,
+        lightningVerifyUrl: invoiceResult.verify,
+        promptpayRef: null,
+        serialNumber: serial,
+      });
+      setQrTxn({
+        ...target,
+        payment_method: 'lightning',
+        amount_sat: amountSat,
+        btc_rate_thb: rate,
+        lightning_invoice: invoiceResult.pr,
+        lightning_verify_url: invoiceResult.verify,
+        promptpay_ref: null,
+        serial_number: serial,
+      });
+      setQrData(invoiceResult.pr);
+      setShowQr(true);
+      refreshRelated();
+    } catch (e: any) {
+      Alert.alert('ผิดพลาด', e?.message ?? 'ไม่สามารถเปลี่ยนวิธีชำระได้');
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+    }
+  };
+  const promptSwitchPendingMethod = (target: Transaction) => {
+    Alert.alert('เปลี่ยนวิธีชำระ', `ยอด ฿${target.amount_thb.toFixed(2)}`, [
+      { text: 'เงินสด', onPress: () => switchPendingMethod(target, 'cash') },
+      { text: 'PromptPay', onPress: () => switchPendingMethod(target, 'promptpay') },
+      { text: 'Lightning', onPress: () => switchPendingMethod(target, 'lightning') },
+      { text: 'ยกเลิก', style: 'cancel' },
+    ]);
   };
   const handleCopyInvoice = async () => {
     if (qrTxn.payment_method !== 'lightning' || !qrData) return;
@@ -373,7 +540,7 @@ function TransactionCard({ txn, onChanged }: { txn: Transaction; onChanged: () =
                   ฿{st.amount_thb.toFixed(2)}
                 </Text>
               </View>
-              {(st.payment_method === 'promptpay' || st.payment_method === 'lightning') && !['cancelled', 'voided', 'refunded'].includes(st.status) && (
+              {(st.payment_method === 'promptpay' || st.payment_method === 'lightning') && !isInactiveStatus(st.status) && (
                 <Pressable
                   className="bg-purple-50 py-2 rounded-xl items-center mt-2"
                   onPress={async (e) => {
@@ -391,6 +558,7 @@ function TransactionCard({ txn, onChanged }: { txn: Transaction; onChanged: () =
                   txn={st}
                   onConfirm={handleConfirmPending}
                   onCheckLightning={handleCheckLightning}
+                  onSwitchMethod={promptSwitchPendingMethod}
                 />
               )}
               </View>
@@ -436,6 +604,7 @@ function TransactionCard({ txn, onChanged }: { txn: Transaction; onChanged: () =
           txn={txn}
           onConfirm={handleConfirmPending}
           onCheckLightning={handleCheckLightning}
+          onSwitchMethod={promptSwitchPendingMethod}
         />
       )}
       {showQr && (
@@ -501,10 +670,12 @@ function PendingActions({
   txn,
   onConfirm,
   onCheckLightning,
+  onSwitchMethod,
 }: {
   txn: Transaction;
   onConfirm: (txn: Transaction) => void;
   onCheckLightning: (txn: Transaction) => void;
+  onSwitchMethod: (txn: Transaction) => void;
 }) {
   return (
     <View className="mt-2 gap-2">
@@ -527,6 +698,15 @@ function PendingActions({
         }}
       >
         <Text className="text-sm font-medium text-green-700">ยืนยันรับเงิน</Text>
+      </Pressable>
+      <Pressable
+        className="bg-white border border-mekha-border py-2 rounded-xl items-center"
+        onPress={(e) => {
+          e.stopPropagation?.();
+          onSwitchMethod(txn);
+        }}
+      >
+        <Text className="text-sm font-medium text-purple-700">เปลี่ยนวิธีชำระ</Text>
       </Pressable>
     </View>
   );
