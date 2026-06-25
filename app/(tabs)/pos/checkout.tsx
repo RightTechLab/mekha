@@ -5,6 +5,7 @@ import { router } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { useColorScheme } from 'nativewind';
 import * as Haptics from 'expo-haptics';
 import * as Crypto from 'expo-crypto';
 import * as SecureStore from 'expo-secure-store';
@@ -31,6 +32,7 @@ import { getBtcRateThb, thbToSats } from '../../../src/lib/exchangeRate';
 import { fetchLnurlPayParams, requestInvoice, createTimingLog, reportTimingLog, parseInvoiceExpiry, checkVerifyUrl, pollInvoice } from '../../../src/lib/lightning';
 import { useLnurlCacheStore } from '../../../src/features/payment/lnurlCacheStore';
 import NumPad from '../../../src/components/NumPad';
+import { DARK_PLACEHOLDER, LIGHT_PLACEHOLDER } from '../../../src/constants/theme';
 import type { CheckoutSplitRecord, PaymentMethod } from '../../../src/types';
 import QRCode from 'react-native-qrcode-svg';
 
@@ -80,6 +82,10 @@ export default function CheckoutScreen() {
   } = useCartStore();
   const insets = useSafeAreaInsets();
   const role = useSessionStore((s) => s.role);
+  const { colorScheme } = useColorScheme();
+  const isDark = colorScheme === 'dark';
+  const placeholderColor = isDark ? DARK_PLACEHOLDER : LIGHT_PLACEHOLDER;
+  const mutedIconColor = isDark ? '#9CA3AF' : '#6B7280';
   const { width, height } = useWindowDimensions();
   const [step, setStep] = useState<CheckoutStep>('summary');
   const [receivedAmount, setReceivedAmount] = useState('');
@@ -1019,9 +1025,9 @@ export default function CheckoutScreen() {
 
   if (step === 'done' && successData) {
     return (
-      <SafeAreaView className="flex-1 bg-white px-6 pt-10">
+      <SafeAreaView className="flex-1 bg-white dark:bg-neutral-950 px-6 pt-10">
         <View className="flex-1 items-center justify-center">
-          <Text className="text-xl font-semibold text-mekha-text">
+          <Text className="text-xl font-semibold text-mekha-text dark:text-neutral-50">
             {successData.hasPending ? 'รอการชำระเงิน' : 'บันทึกบิลแล้ว'}
           </Text>
           <Text className="text-3xl font-bold text-purple-600 mt-2">฿{successData.total.toFixed(2)}</Text>
@@ -1034,17 +1040,17 @@ export default function CheckoutScreen() {
               color={successData.hasPending ? '#6B7280' : 'white'}
             />
           </View>
-          <Text className="text-mekha-muted text-center mb-6">
+          <Text className="text-mekha-muted dark:text-neutral-400 text-center mb-6">
             {successData.hasPending
               ? 'บางรายการชำระเงินยังรอการยืนยัน\nปรับเปลี่ยนจัดการได้ในหน้าประวัติธุรกรรม'
               : 'ทุกรายการชำระเงินได้รับการยืนยันแล้ว'}
           </Text>
 
-          <View className="w-full border-t border-mekha-border pt-4 mb-6">
+          <View className="w-full border-t border-mekha-border dark:border-neutral-800 pt-4 mb-6">
             {successData.splits.map((split, index) => (
               <View
                 key={`${split.transactionId ?? split.label}-${index}`}
-                className="flex-row items-center justify-between bg-purple-50 rounded-xl px-4 py-3 mb-2"
+                className="flex-row items-center justify-between bg-purple-50 dark:bg-purple-950 rounded-xl px-4 py-3 mb-2"
               >
                 <View className="flex-1 mr-3">
                   <Text className="text-sm font-medium text-purple-700">
@@ -1086,14 +1092,14 @@ export default function CheckoutScreen() {
     const canConfirm = received > 0 && received >= payAmount - 0.01;
 
     return (
-      <SafeAreaView className="flex-1 bg-white px-6 pt-8">
-        <Text className="text-xl font-bold text-mekha-text mb-6">จ่ายเงินสด</Text>
-        <Text className="text-mekha-muted mb-2">ยอดที่ต้องชำระ</Text>
+      <SafeAreaView className="flex-1 bg-white dark:bg-neutral-950 px-6 pt-8">
+        <Text className="text-xl font-bold text-mekha-text dark:text-neutral-50 mb-6">จ่ายเงินสด</Text>
+        <Text className="text-mekha-muted dark:text-neutral-400 mb-2">ยอดที่ต้องชำระ</Text>
         <Text className="text-3xl font-bold text-purple-600 mb-6">฿{payAmount.toFixed(2)}</Text>
 
-        <Text className="text-mekha-muted mb-2">จำนวนเงินที่ได้รับ</Text>
-        <View className="bg-mekha-surface border border-mekha-border rounded-2xl px-4 py-4 mb-4">
-          <Text className="text-2xl font-bold text-mekha-text">
+        <Text className="text-mekha-muted dark:text-neutral-400 mb-2">จำนวนเงินที่ได้รับ</Text>
+        <View className="bg-mekha-surface dark:bg-neutral-900 border border-mekha-border dark:border-neutral-800 rounded-2xl px-4 py-4 mb-4">
+          <Text className="text-2xl font-bold text-mekha-text dark:text-neutral-50">
             ฿{receivedAmount || '0'}
           </Text>
         </View>
@@ -1125,7 +1131,7 @@ export default function CheckoutScreen() {
         </Pressable>
 
         <Pressable className="mt-3 items-center" onPress={() => setStep('summary')}>
-          <Text className="text-mekha-muted">ย้อนกลับ</Text>
+          <Text className="text-mekha-muted dark:text-neutral-400">ย้อนกลับ</Text>
         </Pressable>
       </SafeAreaView>
     );
@@ -1134,18 +1140,18 @@ export default function CheckoutScreen() {
   if (step === 'promptpay') {
     const payAmount = activePendingSplit ? activePendingSplit.amount : getPayableAmount();
     return (
-      <SafeAreaView className="flex-1 bg-white items-center justify-center px-8">
-        <Text className="text-xl font-bold text-mekha-text mb-2">PromptPay</Text>
+      <SafeAreaView className="flex-1 bg-white dark:bg-neutral-950 items-center justify-center px-8">
+        <Text className="text-xl font-bold text-mekha-text dark:text-neutral-50 mb-2">PromptPay</Text>
         {currentSerial && (
-          <Text className="text-sm text-mekha-muted mb-1">#{String(currentSerial).padStart(4, '0')}</Text>
+          <Text className="text-sm text-mekha-muted dark:text-neutral-400 mb-1">#{String(currentSerial).padStart(4, '0')}</Text>
         )}
         <Text className="text-3xl font-bold text-purple-600 mb-6">฿{payAmount.toFixed(2)}</Text>
 
-        <View className="bg-white p-4 rounded-2xl border border-mekha-border mb-6">
+        <View className="bg-white p-4 rounded-2xl border border-mekha-border dark:border-neutral-800 mb-6">
           <QRCode value={qrData} size={220} />
         </View>
 
-        <Text className="text-mekha-muted text-center mb-6">
+        <Text className="text-mekha-muted dark:text-neutral-400 text-center mb-6">
           ลูกค้าสแกน QR เพื่อชำระเงิน{'\n'}กดยืนยันเมื่อตรวจสอบยอดเรียบร้อย
         </Text>
 
@@ -1166,10 +1172,10 @@ export default function CheckoutScreen() {
 
         {activePendingIndex == null ? (
           <Pressable
-            className="mt-3 w-full py-4 rounded-2xl items-center bg-purple-50 border border-purple-200"
+            className="mt-3 w-full py-4 rounded-2xl items-center bg-purple-50 dark:bg-purple-950 border border-purple-200 dark:border-purple-900"
             onPress={() => recordPendingPayment('promptpay')}
           >
-            <Text className="text-purple-700 font-semibold">
+            <Text className="text-purple-700 dark:text-purple-200 font-semibold">
               พักไว้ / ไปคิดคนถัดไป
             </Text>
           </Pressable>
@@ -1179,7 +1185,7 @@ export default function CheckoutScreen() {
           setActivePendingIndex(null);
           setStep('summary');
         }}>
-          <Text className="text-mekha-muted">
+          <Text className="text-mekha-muted dark:text-neutral-400">
             {activePendingIndex == null ? 'ย้อนกลับโดยไม่บันทึก' : 'กลับไปสรุป'}
           </Text>
         </Pressable>
@@ -1190,14 +1196,14 @@ export default function CheckoutScreen() {
   if (step === 'lightning') {
     const payAmount = activePendingSplit ? activePendingSplit.amount : getPayableAmount();
     return (
-      <SafeAreaView className="flex-1 bg-white items-center justify-center px-8">
-        <Text className="text-xl font-bold text-mekha-text mb-2">Lightning</Text>
+      <SafeAreaView className="flex-1 bg-white dark:bg-neutral-950 items-center justify-center px-8">
+        <Text className="text-xl font-bold text-mekha-text dark:text-neutral-50 mb-2">Lightning</Text>
         {currentSerial && (
-          <Text className="text-sm text-mekha-muted mb-1">#{String(currentSerial).padStart(4, '0')}</Text>
+          <Text className="text-sm text-mekha-muted dark:text-neutral-400 mb-1">#{String(currentSerial).padStart(4, '0')}</Text>
         )}
         <Text className="text-3xl font-bold text-purple-600 mb-2">฿{payAmount.toFixed(2)}</Text>
         {lnAmountSat > 0 && (
-          <Text className="text-mekha-muted text-sm mb-6">
+          <Text className="text-mekha-muted dark:text-neutral-400 text-sm mb-6">
             ≈ {lnAmountSat.toLocaleString()} sats (฿{lnRate.toLocaleString()}/BTC)
           </Text>
         )}
@@ -1205,7 +1211,7 @@ export default function CheckoutScreen() {
         {lnLoading && (
           <View className="items-center py-8">
             <ActivityIndicator size="large" color="#7C3AED" />
-            <Text className="text-mekha-muted mt-3">กำลังสร้าง Invoice...</Text>
+            <Text className="text-mekha-muted dark:text-neutral-400 mt-3">กำลังสร้าง Invoice...</Text>
           </View>
         )}
 
@@ -1232,7 +1238,7 @@ export default function CheckoutScreen() {
         ) : lnInvoice && !lnLoading ? (
           <>
             <Pressable
-              className="bg-white p-4 rounded-2xl border border-mekha-border mb-4"
+              className="bg-white p-4 rounded-2xl border border-mekha-border dark:border-neutral-800 mb-4"
               onPress={() => {
                 Clipboard.setStringAsync(lnInvoice);
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -1254,12 +1260,12 @@ export default function CheckoutScreen() {
                 >
                   <Text className="text-amber-700 font-semibold">ตรวจสอบ Lightning</Text>
                 </Pressable>
-                <Text className="text-mekha-muted text-xs text-center mt-2">
+                <Text className="text-mekha-muted dark:text-neutral-400 text-xs text-center mt-2">
                   กดตรวจสอบหลังลูกค้าชำระเงินแล้ว
                 </Text>
               </View>
             ) : (
-              <Text className="text-mekha-muted text-center text-sm mb-4">
+              <Text className="text-mekha-muted dark:text-neutral-400 text-center text-sm mb-4">
                 ลูกค้าสแกน QR เพื่อชำระ
               </Text>
             )}
@@ -1279,10 +1285,10 @@ export default function CheckoutScreen() {
             </Pressable>
             {activePendingIndex == null ? (
               <Pressable
-                className="mt-3 w-full py-4 rounded-2xl items-center bg-purple-50 border border-purple-200"
+                className="mt-3 w-full py-4 rounded-2xl items-center bg-purple-50 dark:bg-purple-950 border border-purple-200 dark:border-purple-900"
                 onPress={() => recordPendingPayment('lightning', { amountSat: lnAmountSat, btcRate: lnRate })}
               >
-                <Text className="text-purple-700 font-semibold">
+                <Text className="text-purple-700 dark:text-purple-200 font-semibold">
                   พักไว้ / ไปคิดคนถัดไป
                 </Text>
               </Pressable>
@@ -1294,7 +1300,7 @@ export default function CheckoutScreen() {
           setActivePendingIndex(null);
           setStep('summary');
         }}>
-          <Text className="text-mekha-muted">
+          <Text className="text-mekha-muted dark:text-neutral-400">
             {activePendingIndex == null ? 'ย้อนกลับโดยไม่บันทึก' : 'กลับไปสรุป'}
           </Text>
         </Pressable>
@@ -1318,29 +1324,29 @@ export default function CheckoutScreen() {
             <View className="flex-row flex-wrap gap-2 mt-2">
               {s.method !== 'cash' && (
                 <Pressable
-                  className="px-3 py-1.5 rounded-lg bg-purple-50 border border-purple-200"
+                  className="px-3 py-1.5 rounded-lg bg-purple-50 dark:bg-purple-950 border border-purple-200 dark:border-purple-900"
                   onPress={() => openPendingSplit(i)}
                 >
-                  <Text className="text-xs font-medium text-purple-700">แสดง QR</Text>
+                  <Text className="text-xs font-medium text-purple-700 dark:text-purple-300">แสดง QR</Text>
                 </Pressable>
               )}
               <Pressable
-                className="px-3 py-1.5 rounded-lg bg-green-50 border border-green-200"
+                className="px-3 py-1.5 rounded-lg bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-900"
                 onPress={() => confirmPendingSplit(i)}
               >
-                <Text className="text-xs font-medium text-green-700">ยืนยัน</Text>
+                <Text className="text-xs font-medium text-green-700 dark:text-green-300">ยืนยัน</Text>
               </Pressable>
               <Pressable
-                className="px-3 py-1.5 rounded-lg bg-white border border-mekha-border"
+                className="px-3 py-1.5 rounded-lg bg-white dark:bg-neutral-950 border border-mekha-border dark:border-neutral-800"
                 onPress={() => promptSwitchPendingMethod(i)}
               >
-                <Text className="text-xs font-medium text-purple-700">เปลี่ยนวิธี</Text>
+                <Text className="text-xs font-medium text-purple-700 dark:text-purple-300">เปลี่ยนวิธี</Text>
               </Pressable>
               <Pressable
-                className="px-3 py-1.5 rounded-lg bg-red-50 border border-red-200"
+                className="px-3 py-1.5 rounded-lg bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-900"
                 onPress={() => cancelPendingSplit(i)}
               >
-                <Text className="text-xs font-medium text-red-700">ยกเลิก</Text>
+                <Text className="text-xs font-medium text-red-700 dark:text-red-300">ยกเลิก</Text>
               </Pressable>
             </View>
           )}
@@ -1355,13 +1361,13 @@ export default function CheckoutScreen() {
 
   const itemListContent = (
     <>
-      <Text className="text-xl font-bold text-mekha-text mb-4">สรุปออเดอร์</Text>
+      <Text className="text-xl font-bold text-mekha-text dark:text-neutral-50 mb-4">สรุปออเดอร์</Text>
 
       {/* Table badge */}
       {tableName && (
-        <View className="bg-purple-50 rounded-xl px-4 py-2 mb-3 flex-row items-center gap-2">
+        <View className="bg-purple-50 dark:bg-purple-950 rounded-xl px-4 py-2 mb-3 flex-row items-center gap-2">
           <Ionicons name="grid-outline" size={16} color="#7C3AED" />
-          <Text className="text-purple-700 font-medium">{tableName}</Text>
+          <Text className="text-purple-700 dark:text-purple-300 font-medium">{tableName}</Text>
         </View>
       )}
 
@@ -1369,27 +1375,27 @@ export default function CheckoutScreen() {
       {items.map((item, idx) => (
         <View
           key={`${item.menuId}-${idx}`}
-          className="py-3 border-b border-mekha-border"
+          className="py-3 border-b border-mekha-border dark:border-neutral-800"
         >
           <View className="flex-row items-center justify-between">
             <View className="flex-1 mr-3">
-              <Text className="text-sm font-medium text-mekha-text">{item.name}</Text>
+              <Text className="text-sm font-medium text-mekha-text dark:text-neutral-50">{item.name}</Text>
               {item.selectedOptions.length > 0 && (
-                <Text className="text-xs text-purple-600">
+                <Text className="text-xs text-purple-600 dark:text-purple-300">
                   {item.selectedOptions.map((o) => o.itemName).join(', ')}
                 </Text>
               )}
               {item.note ? (
-                <Text className="text-xs text-mekha-muted italic">"{item.note}"</Text>
+                <Text className="text-xs text-mekha-muted dark:text-neutral-400 italic">"{item.note}"</Text>
               ) : null}
             </View>
-            <Text className="text-sm font-semibold text-mekha-text w-16 text-right">
+            <Text className="text-sm font-semibold text-mekha-text dark:text-neutral-50 w-16 text-right">
               ฿{item.itemTotal.toFixed(0)}
             </Text>
           </View>
           <View className="flex-row items-center mt-2 gap-2">
             <Pressable
-              className={`w-8 h-8 rounded-full items-center justify-center ${isCartLocked ? 'bg-gray-100' : 'bg-red-50'}`}
+              className={`w-8 h-8 rounded-full items-center justify-center ${isCartLocked ? 'bg-gray-100 dark:bg-neutral-900' : 'bg-red-50 dark:bg-red-950'}`}
               onPress={() => {
                 if (isCartLocked) return;
                 if (item.quantity <= 1) {
@@ -1400,35 +1406,35 @@ export default function CheckoutScreen() {
               }}
               disabled={isCartLocked}
             >
-              <Text className={`${isCartLocked ? 'text-gray-400' : 'text-red-700'} font-bold text-base`}>
+              <Text className={`${isCartLocked ? 'text-gray-400 dark:text-neutral-500' : 'text-red-700 dark:text-red-300'} font-bold text-base`}>
                 {item.quantity <= 1 ? '✕' : '−'}
               </Text>
             </Pressable>
-            <Text className="text-sm font-medium w-8 text-center">{item.quantity}</Text>
+            <Text className="text-sm font-medium w-8 text-center text-mekha-text dark:text-neutral-50">{item.quantity}</Text>
             <Pressable
-              className={`w-8 h-8 rounded-full items-center justify-center ${isCartLocked ? 'bg-gray-100' : 'bg-purple-50'}`}
+              className={`w-8 h-8 rounded-full items-center justify-center ${isCartLocked ? 'bg-gray-100 dark:bg-neutral-900' : 'bg-purple-50 dark:bg-purple-950'}`}
               onPress={() => {
                 if (isCartLocked) return;
                 updateQty(item.menuId, item.quantity + 1);
               }}
               disabled={isCartLocked}
             >
-              <Text className={`${isCartLocked ? 'text-gray-400' : 'text-purple-700'} font-bold text-base`}>+</Text>
+              <Text className={`${isCartLocked ? 'text-gray-400 dark:text-neutral-500' : 'text-purple-700 dark:text-purple-300'} font-bold text-base`}>+</Text>
             </Pressable>
-            <Text className="text-xs text-mekha-muted ml-1">@฿{item.unitPrice}</Text>
+            <Text className="text-xs text-mekha-muted dark:text-neutral-400 ml-1">@฿{item.unitPrice}</Text>
           </View>
         </View>
       ))}
 
       {items.length === 0 && (
         <View className="py-8 items-center">
-          <Text className="text-mekha-muted">ไม่มีสินค้าในตะกร้า</Text>
+          <Text className="text-mekha-muted dark:text-neutral-400">ไม่มีสินค้าในตะกร้า</Text>
         </View>
       )}
 
       {/* Discount section */}
       <View className="mt-6 mb-2">
-        <Text className="text-base font-semibold text-mekha-text mb-3">ส่วนลด</Text>
+        <Text className="text-base font-semibold text-mekha-text dark:text-neutral-50 mb-3">ส่วนลด</Text>
         <View className="flex-row gap-2 mb-2">
           {[5, 10, 15, 20].map((pct) => {
             const isActive = discount?.type === 'percent' && discount.value === pct;
@@ -1438,7 +1444,7 @@ export default function CheckoutScreen() {
                 className={`flex-1 py-2 rounded-xl items-center border ${
                   isActive
                     ? 'bg-purple-600 border-purple-600'
-                    : 'bg-purple-50 border-purple-200'
+                    : 'bg-purple-50 dark:bg-purple-950 border-purple-200 dark:border-purple-900'
                 }`}
                 onPress={() => {
                   if (isCartLocked) return;
@@ -1453,7 +1459,7 @@ export default function CheckoutScreen() {
               >
                 <Text
                   className={`text-sm font-medium ${
-                    isActive ? 'text-white' : 'text-purple-700'
+                    isActive ? 'text-white' : 'text-purple-700 dark:text-purple-300'
                   }`}
                 >
                   {pct}%
@@ -1468,7 +1474,7 @@ export default function CheckoutScreen() {
             className={`flex-1 py-2 rounded-xl items-center border ${
               showCustomDiscount
                 ? 'bg-purple-600 border-purple-600'
-                : 'bg-purple-50 border-purple-200'
+                : 'bg-purple-50 dark:bg-purple-950 border-purple-200 dark:border-purple-900'
             }`}
             onPress={() => {
               if (isCartLocked) return;
@@ -1482,7 +1488,7 @@ export default function CheckoutScreen() {
           >
             <Text
               className={`text-sm font-medium ${
-                showCustomDiscount ? 'text-white' : 'text-purple-700'
+                showCustomDiscount ? 'text-white' : 'text-purple-700 dark:text-purple-300'
               }`}
             >
               กำหนดเอง
@@ -1490,7 +1496,7 @@ export default function CheckoutScreen() {
           </Pressable>
           {discount && (
             <Pressable
-              className="py-2 px-4 rounded-xl items-center bg-red-50 border border-red-200"
+              className="py-2 px-4 rounded-xl items-center bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-900"
               onPress={() => {
                 if (isCartLocked) return;
                 setDiscount(null);
@@ -1499,23 +1505,23 @@ export default function CheckoutScreen() {
               }}
               disabled={isCartLocked}
             >
-              <Text className="text-sm font-medium text-red-700">ยกเลิก</Text>
+              <Text className="text-sm font-medium text-red-700 dark:text-red-300">ยกเลิก</Text>
             </Pressable>
           )}
         </View>
 
         {showCustomDiscount && (
-          <View className="mt-3 bg-mekha-surface rounded-xl p-3 border border-mekha-border">
+          <View className="mt-3 bg-mekha-surface dark:bg-neutral-900 rounded-xl p-3 border border-mekha-border dark:border-neutral-800">
             <View className="flex-row gap-2 mb-2">
               <Pressable
                 className={`flex-1 py-2 rounded-lg items-center ${
-                  customDiscountType === 'percent' ? 'bg-purple-600' : 'bg-purple-50'
+                  customDiscountType === 'percent' ? 'bg-purple-600' : 'bg-purple-50 dark:bg-purple-950'
                 }`}
                 onPress={() => setCustomDiscountType('percent')}
               >
                 <Text
                   className={`text-sm font-medium ${
-                    customDiscountType === 'percent' ? 'text-white' : 'text-purple-700'
+                    customDiscountType === 'percent' ? 'text-white' : 'text-purple-700 dark:text-purple-300'
                   }`}
                 >
                   เปอร์เซ็นต์ (%)
@@ -1523,13 +1529,13 @@ export default function CheckoutScreen() {
               </Pressable>
               <Pressable
                 className={`flex-1 py-2 rounded-lg items-center ${
-                  customDiscountType === 'fixed' ? 'bg-purple-600' : 'bg-purple-50'
+                  customDiscountType === 'fixed' ? 'bg-purple-600' : 'bg-purple-50 dark:bg-purple-950'
                 }`}
                 onPress={() => setCustomDiscountType('fixed')}
               >
                 <Text
                   className={`text-sm font-medium ${
-                    customDiscountType === 'fixed' ? 'text-white' : 'text-purple-700'
+                    customDiscountType === 'fixed' ? 'text-white' : 'text-purple-700 dark:text-purple-300'
                   }`}
                 >
                   จำนวนเงิน (฿)
@@ -1538,9 +1544,9 @@ export default function CheckoutScreen() {
             </View>
             <View className="flex-row items-center gap-2">
               <TextInput
-                className="flex-1 border border-mekha-border rounded-lg px-3 py-2 text-sm text-mekha-text"
+                className="flex-1 border border-mekha-border dark:border-neutral-800 rounded-lg px-3 py-2 text-sm text-mekha-text dark:text-neutral-50 bg-white dark:bg-neutral-950"
                 placeholder={customDiscountType === 'percent' ? 'เช่น 12' : 'เช่น 50'}
-                placeholderTextColor="#9CA3AF"
+                placeholderTextColor={placeholderColor}
                 keyboardType="decimal-pad"
                 value={customDiscountValue}
                 onChangeText={setCustomDiscountValue}
@@ -1574,8 +1580,8 @@ export default function CheckoutScreen() {
           className="flex-row items-center justify-between mb-3"
           onPress={() => setShowSplitOptions(!showSplitOptions)}
         >
-          <Text className="text-base font-semibold text-mekha-text">ตัวเลือกเพิ่มเติม</Text>
-          <Ionicons name={showSplitOptions ? 'chevron-up' : 'chevron-down'} size={18} color="#6B7280" />
+          <Text className="text-base font-semibold text-mekha-text dark:text-neutral-50">ตัวเลือกเพิ่มเติม</Text>
+          <Ionicons name={showSplitOptions ? 'chevron-up' : 'chevron-down'} size={18} color={mutedIconColor} />
         </Pressable>
         {showSplitOptions && (
           <>
@@ -1590,7 +1596,7 @@ export default function CheckoutScreen() {
               className={`flex-1 py-3 rounded-xl items-center border ${
                 splitMode === mode
                   ? 'bg-purple-600 border-purple-600'
-                  : 'bg-purple-50 border-purple-200'
+                  : 'bg-purple-50 dark:bg-purple-950 border-purple-200 dark:border-purple-900'
               }`}
               onPress={() => {
                 handleSplitModeChange(mode);
@@ -1598,7 +1604,7 @@ export default function CheckoutScreen() {
             >
               <Text
                 className={`text-sm font-medium ${
-                  splitMode === mode ? 'text-white' : 'text-purple-700'
+                  splitMode === mode ? 'text-white' : 'text-purple-700 dark:text-purple-300'
                 }`}
               >
                 {label}
@@ -1609,8 +1615,8 @@ export default function CheckoutScreen() {
 
         {/* Equal split - customer count */}
         {splitMode === 'equal' && (
-          <View className="p-4 bg-blue-50 border border-blue-200 rounded-xl mb-3">
-            <Text className="text-sm font-semibold text-blue-900 mb-3">จำนวนคน</Text>
+          <View className="p-4 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-900 rounded-xl mb-3">
+            <Text className="text-sm font-semibold text-blue-900 dark:text-blue-100 mb-3">จำนวนคน</Text>
             <View className="flex-row items-center gap-3">
               <Pressable
                 className="w-10 h-10 rounded-lg bg-blue-200 items-center justify-center"
@@ -1619,7 +1625,7 @@ export default function CheckoutScreen() {
                 <Text className="text-lg font-bold text-blue-700">−</Text>
               </Pressable>
               <TextInput
-                className="flex-1 border border-blue-300 rounded-lg px-3 py-2 text-center text-mekha-text font-semibold"
+                className="flex-1 border border-blue-300 dark:border-blue-800 rounded-lg px-3 py-2 text-center text-mekha-text dark:text-neutral-50 font-semibold bg-white dark:bg-neutral-950"
                 keyboardType="number-pad"
                 value={customerCount.toString()}
                 onChangeText={(v) => setCustomerCount(Math.max(2, parseInt(v) || 2))}
@@ -1631,10 +1637,10 @@ export default function CheckoutScreen() {
                 <Text className="text-lg font-bold text-white">+</Text>
               </Pressable>
             </View>
-            <View className="mt-3 bg-white rounded-lg p-3">
+            <View className="mt-3 bg-white dark:bg-neutral-950 rounded-lg p-3">
               <View className="flex-row justify-between">
-                <Text className="text-sm text-blue-900">คนละ</Text>
-                <Text className="text-lg font-bold text-blue-600">฿{splitPerPerson.toFixed(2)}</Text>
+                <Text className="text-sm text-blue-900 dark:text-blue-100">คนละ</Text>
+                <Text className="text-lg font-bold text-blue-600 dark:text-blue-300">฿{splitPerPerson.toFixed(2)}</Text>
               </View>
             </View>
 
@@ -1647,8 +1653,8 @@ export default function CheckoutScreen() {
 
         {/* Item selection */}
         {splitMode === 'items' && (
-          <View className="p-4 bg-orange-50 border border-orange-200 rounded-xl mb-3">
-            <Text className="text-sm font-semibold text-orange-900 mb-3">เลือกเมนูที่จะจ่าย</Text>
+          <View className="p-4 bg-orange-50 dark:bg-orange-950 border border-orange-200 dark:border-orange-900 rounded-xl mb-3">
+            <Text className="text-sm font-semibold text-orange-900 dark:text-orange-100 mb-3">เลือกเมนูที่จะจ่าย</Text>
             {expandedUnits.map((unit, idx) => {
               const isPaid = paidUnitIndices.has(idx);
               const isSelected = selectedUnitIndices.has(idx);
@@ -1656,13 +1662,13 @@ export default function CheckoutScreen() {
                 return (
                   <View
                     key={`unit-${idx}`}
-                    className="flex-row items-center justify-between py-3 px-3 mb-1 rounded-xl bg-green-100 opacity-60"
+                    className="flex-row items-center justify-between py-3 px-3 mb-1 rounded-xl bg-green-100 dark:bg-green-950 opacity-60"
                   >
                     <View className="flex-row items-center gap-2 flex-1">
                       <Ionicons name="checkmark-circle" size={20} color="#22C55E" />
-                      <Text className="text-sm text-mekha-muted line-through">{unit.name}</Text>
+                      <Text className="text-sm text-mekha-muted dark:text-neutral-400 line-through">{unit.name}</Text>
                     </View>
-                    <Text className="text-sm text-green-700 font-medium">จ่ายแล้ว</Text>
+                    <Text className="text-sm text-green-700 dark:text-green-300 font-medium">จ่ายแล้ว</Text>
                   </View>
                 );
               }
@@ -1670,7 +1676,7 @@ export default function CheckoutScreen() {
                 <Pressable
                   key={`unit-${idx}`}
                   className={`flex-row items-center justify-between py-3 px-3 mb-1 rounded-xl ${
-                    isSelected ? 'bg-orange-200' : 'bg-white'
+                    isSelected ? 'bg-orange-200 dark:bg-orange-900' : 'bg-white dark:bg-neutral-950'
                   }`}
                   onPress={() => {
                     const next = new Set(selectedUnitIndices);
@@ -1685,23 +1691,23 @@ export default function CheckoutScreen() {
                   <View className="flex-row items-center gap-2 flex-1">
                     <Ionicons name={isSelected ? 'checkbox' : 'square-outline'} size={20} color={isSelected ? '#EA580C' : '#9CA3AF'} />
                     <View className="flex-1">
-                      <Text className="text-sm text-mekha-text">{unit.name}</Text>
+                      <Text className="text-sm text-mekha-text dark:text-neutral-50">{unit.name}</Text>
                       {unit.options.length > 0 && (
-                        <Text className="text-xs text-mekha-muted">
+                        <Text className="text-xs text-mekha-muted dark:text-neutral-400">
                           {unit.options.map((o) => o.itemName).join(', ')}
                         </Text>
                       )}
                     </View>
                   </View>
-                  <Text className="text-sm font-semibold text-mekha-text">฿{unit.unitPayTotal.toFixed(2)}</Text>
+                  <Text className="text-sm font-semibold text-mekha-text dark:text-neutral-50">฿{unit.unitPayTotal.toFixed(2)}</Text>
                 </Pressable>
               );
             })}
             {selectedUnitIndices.size > 0 && (
-              <View className="mt-3 bg-white rounded-lg p-3">
+              <View className="mt-3 bg-white dark:bg-neutral-950 rounded-lg p-3">
                 <View className="flex-row justify-between">
-                  <Text className="text-sm text-orange-900">ยอดที่เลือก ({selectedUnitIndices.size} รายการ)</Text>
-                  <Text className="text-lg font-bold text-orange-600">฿{selectedItemsTotal.toFixed(2)}</Text>
+                  <Text className="text-sm text-orange-900 dark:text-orange-100">ยอดที่เลือก ({selectedUnitIndices.size} รายการ)</Text>
+                  <Text className="text-lg font-bold text-orange-600 dark:text-orange-300">฿{selectedItemsTotal.toFixed(2)}</Text>
                 </View>
               </View>
             )}
@@ -1718,29 +1724,29 @@ export default function CheckoutScreen() {
 
       {/* Totals */}
       {splitMode === 'none' && paidSplits.length > 0 && (
-        <View className="mb-4 p-4 bg-purple-50 border border-purple-200 rounded-xl">
-          <Text className="text-sm font-semibold text-purple-900 mb-2">รายการชำระเงิน</Text>
+        <View className="mb-4 p-4 bg-purple-50 dark:bg-purple-950 border border-purple-200 dark:border-purple-900 rounded-xl">
+          <Text className="text-sm font-semibold text-purple-900 dark:text-purple-100 mb-2">รายการชำระเงิน</Text>
           {renderSplitHistory('blue')}
         </View>
       )}
 
       {isCartLocked && (
-        <View className="mb-4 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
-          <Text className="text-xs text-amber-700 text-center">
+        <View className="mb-4 bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-900 rounded-xl px-3 py-2">
+          <Text className="text-xs text-amber-700 dark:text-amber-200 text-center">
             เริ่มรับชำระเงินแล้ว รายการอาหารจะถูกล็อกจนกว่าจะปิดบิล
           </Text>
         </View>
       )}
 
       {/* Totals */}
-      <View className={`border-t border-mekha-border pt-4 ${isLandscape ? '' : 'mt-4'}`}>
+      <View className={`border-t border-mekha-border dark:border-neutral-800 pt-4 ${isLandscape ? '' : 'mt-4'}`}>
         <View className="flex-row justify-between mb-1">
-          <Text className="text-mekha-muted">ยอดรวม</Text>
-          <Text className="text-mekha-text">฿{subtotal.toFixed(2)}</Text>
+          <Text className="text-mekha-muted dark:text-neutral-400">ยอดรวม</Text>
+          <Text className="text-mekha-text dark:text-neutral-50">฿{subtotal.toFixed(2)}</Text>
         </View>
         {discountAmount > 0 && (
           <View className="flex-row justify-between mb-1">
-            <Text className="text-mekha-muted">
+            <Text className="text-mekha-muted dark:text-neutral-400">
               ส่วนลด{discount?.type === 'percent' ? ` ${discount.value}%` : ''}
             </Text>
             <Text className="text-red-700">-฿{discountAmount.toFixed(2)}</Text>
@@ -1748,96 +1754,96 @@ export default function CheckoutScreen() {
         )}
         {serviceChargeAmount > 0 && (
           <View className="flex-row justify-between mb-1">
-            <Text className="text-mekha-muted">Service Charge {serviceChargeRate}%</Text>
-            <Text className="text-mekha-text">฿{serviceChargeAmount.toFixed(2)}</Text>
+            <Text className="text-mekha-muted dark:text-neutral-400">Service Charge {serviceChargeRate}%</Text>
+            <Text className="text-mekha-text dark:text-neutral-50">฿{serviceChargeAmount.toFixed(2)}</Text>
           </View>
         )}
         <View className="flex-row justify-between mb-1">
-          <Text className="text-mekha-muted">VAT {vatRate}%{vatIncluded ? ' (รวม)' : ''}</Text>
-          <Text className="text-mekha-text">฿{vatAmount.toFixed(2)}</Text>
+          <Text className="text-mekha-muted dark:text-neutral-400">VAT {vatRate}%{vatIncluded ? ' (รวม)' : ''}</Text>
+          <Text className="text-mekha-text dark:text-neutral-50">฿{vatAmount.toFixed(2)}</Text>
         </View>
-        <View className="flex-row justify-between mt-2 pt-2 border-t border-mekha-border">
-          <Text className="text-lg font-bold text-mekha-text">ยอดชำระ</Text>
-          <Text className="text-lg font-bold text-purple-600">฿{finalTotal.toFixed(2)}</Text>
+        <View className="flex-row justify-between mt-2 pt-2 border-t border-mekha-border dark:border-neutral-800">
+          <Text className="text-lg font-bold text-mekha-text dark:text-neutral-50">ยอดชำระ</Text>
+          <Text className="text-lg font-bold text-purple-600 dark:text-purple-300">฿{finalTotal.toFixed(2)}</Text>
         </View>
         {totalPaid > 0 && (
           <View className="flex-row justify-between mt-1">
-            <Text className="text-sm text-green-700">จ่ายแล้ว</Text>
-            <Text className="text-sm font-semibold text-green-700">฿{totalPaid.toFixed(2)}</Text>
+            <Text className="text-sm text-green-700 dark:text-green-300">จ่ายแล้ว</Text>
+            <Text className="text-sm font-semibold text-green-700 dark:text-green-300">฿{totalPaid.toFixed(2)}</Text>
           </View>
         )}
         {totalPending > 0 && (
           <View className="flex-row justify-between mt-1">
-            <Text className="text-sm text-amber-700 font-semibold">รอชำระ</Text>
-            <Text className="text-sm font-semibold text-amber-700">฿{totalPending.toFixed(2)}</Text>
+            <Text className="text-sm text-amber-700 dark:text-amber-300 font-semibold">รอชำระ</Text>
+            <Text className="text-sm font-semibold text-amber-700 dark:text-amber-300">฿{totalPending.toFixed(2)}</Text>
           </View>
         )}
         {splitMode !== 'none' && remaining > 0 && remaining < finalTotal && (
           <View className="flex-row justify-between mt-1">
-            <Text className="text-sm text-red-600 font-semibold">คงเหลือ</Text>
-            <Text className="text-sm font-bold text-red-600">฿{remaining.toFixed(2)}</Text>
+            <Text className="text-sm text-red-600 dark:text-red-300 font-semibold">คงเหลือ</Text>
+            <Text className="text-sm font-bold text-red-600 dark:text-red-300">฿{remaining.toFixed(2)}</Text>
           </View>
         )}
         {totalPending > 0 && remaining <= 0 && (
-          <View className="mt-3 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
-            <Text className="text-xs text-amber-700 text-center">
+          <View className="mt-3 bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-900 rounded-xl px-3 py-2">
+            <Text className="text-xs text-amber-700 dark:text-amber-200 text-center">
               ยังมีรายการรอชำระ กดยืนยันหรือเปลี่ยนวิธีจากรายการด้านบนก่อนปิดบิล
             </Text>
           </View>
         )}
       </View>
 
-      <Text className="text-base font-semibold text-mekha-text mt-6 mb-4">
+      <Text className="text-base font-semibold text-mekha-text dark:text-neutral-50 mt-6 mb-4">
         เลือกวิธีชำระเงิน
       </Text>
 
       <Pressable
         className={`w-full py-4 rounded-2xl items-center border mb-3 ${
-          items.length > 0 && getPayableAmount() > 0 ? 'bg-green-50 border-green-700' : 'bg-gray-100 border-gray-300'
+          items.length > 0 && getPayableAmount() > 0 ? 'bg-green-50 dark:bg-green-950 border-green-700 dark:border-green-700' : 'bg-gray-100 dark:bg-neutral-900 border-gray-300 dark:border-neutral-800'
         }`}
         onPress={() => handlePayment('cash')}
         disabled={items.length === 0 || getPayableAmount() <= 0}
       >
-        <Text className={`font-semibold ${items.length > 0 && getPayableAmount() > 0 ? 'text-green-700' : 'text-gray-400'}`}>
+        <Text className={`font-semibold ${items.length > 0 && getPayableAmount() > 0 ? 'text-green-700 dark:text-green-300' : 'text-gray-400 dark:text-neutral-500'}`}>
           เงินสด
         </Text>
       </Pressable>
 
       <Pressable
         className={`w-full py-4 rounded-2xl items-center border mb-3 ${
-          items.length > 0 && getPayableAmount() > 0 ? 'bg-blue-50 border-blue-700' : 'bg-gray-100 border-gray-300'
+          items.length > 0 && getPayableAmount() > 0 ? 'bg-blue-50 dark:bg-blue-950 border-blue-700 dark:border-blue-700' : 'bg-gray-100 dark:bg-neutral-900 border-gray-300 dark:border-neutral-800'
         }`}
         onPress={() => handlePayment('promptpay')}
         disabled={items.length === 0 || getPayableAmount() <= 0}
       >
-        <Text className={`font-semibold ${items.length > 0 && getPayableAmount() > 0 ? 'text-blue-700' : 'text-gray-400'}`}>
+        <Text className={`font-semibold ${items.length > 0 && getPayableAmount() > 0 ? 'text-blue-700 dark:text-blue-300' : 'text-gray-400 dark:text-neutral-500'}`}>
           PromptPay
         </Text>
       </Pressable>
 
       <Pressable
         className={`w-full py-4 rounded-2xl items-center border mb-3 ${
-          items.length > 0 && getPayableAmount() > 0 ? 'bg-yellow-50 border-yellow-700' : 'bg-gray-100 border-gray-300'
+          items.length > 0 && getPayableAmount() > 0 ? 'bg-yellow-50 dark:bg-yellow-950 border-yellow-700 dark:border-yellow-700' : 'bg-gray-100 dark:bg-neutral-900 border-gray-300 dark:border-neutral-800'
         }`}
         onPress={() => handlePayment('lightning')}
         disabled={items.length === 0 || getPayableAmount() <= 0}
       >
-        <Text className={`font-semibold ${items.length > 0 && getPayableAmount() > 0 ? 'text-yellow-700' : 'text-gray-400'}`}>
+        <Text className={`font-semibold ${items.length > 0 && getPayableAmount() > 0 ? 'text-yellow-700 dark:text-yellow-300' : 'text-gray-400 dark:text-neutral-500'}`}>
           Lightning
         </Text>
       </Pressable>
 
       <Pressable className="items-center py-3" onPress={() => router.back()}>
-        <Text className="text-mekha-muted">ย้อนกลับ</Text>
+        <Text className="text-mekha-muted dark:text-neutral-400">ย้อนกลับ</Text>
       </Pressable>
     </>
   );
 
   if (isLandscape) {
     return (
-      <SafeAreaView className="flex-1 bg-white">
+      <SafeAreaView className="flex-1 bg-white dark:bg-neutral-950">
         <View className="flex-1 flex-row">
-          <ScrollView className="flex-[2] px-6 pt-6 border-r border-mekha-border" contentContainerStyle={{ paddingBottom: insets.bottom + 80 }}>
+          <ScrollView className="flex-[2] px-6 pt-6 border-r border-mekha-border dark:border-neutral-800" contentContainerStyle={{ paddingBottom: insets.bottom + 80 }}>
             {itemListContent}
           </ScrollView>
           <ScrollView className="flex-[1] px-4 pt-6" contentContainerStyle={{ paddingBottom: insets.bottom + 80 }}>
@@ -1849,7 +1855,7 @@ export default function CheckoutScreen() {
   }
 
   return (
-    <SafeAreaView className="flex-1 bg-white">
+    <SafeAreaView className="flex-1 bg-white dark:bg-neutral-950">
       <ScrollView className="flex-1 px-6 pt-6" contentContainerStyle={{ paddingBottom: insets.bottom + 80 }}>
         {itemListContent}
         {paymentContent}

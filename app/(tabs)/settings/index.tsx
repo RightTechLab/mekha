@@ -10,6 +10,7 @@ import * as DocumentPicker from 'expo-document-picker';
 import * as Haptics from 'expo-haptics';
 import { subDays } from 'date-fns';
 import { router } from 'expo-router';
+import { useColorScheme } from 'nativewind';
 import { useSessionStore } from '../../../src/features/auth/sessionStore';
 import { getSetting, setSetting, getTransactions } from '../../../src/db/repositories/transactionRepo';
 import { getAllMenus, createMenu, getMenuById, getAllCategories, createCategory } from '../../../src/db/repositories/menuRepo';
@@ -18,11 +19,21 @@ import { useLnurlCacheStore } from '../../../src/features/payment/lnurlCacheStor
 import db from '../../../src/db/client';
 import { generateLightningReport } from '../../../src/lib/exportPdf';
 import { getBangkokDateKey } from '../../../src/lib/time';
+import {
+  DARK_PLACEHOLDER,
+  LIGHT_PLACEHOLDER,
+  normalizeThemePreference,
+  THEME_SETTING_KEY,
+  type ThemePreference,
+} from '../../../src/constants/theme';
 import type { TableItem } from '../../../src/db/repositories/tableRepo';
 
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
   const { logout } = useSessionStore();
+  const { colorScheme, setColorScheme } = useColorScheme();
+  const isDark = colorScheme === 'dark';
+  const placeholderColor = isDark ? DARK_PLACEHOLDER : LIGHT_PLACEHOLDER;
 
   const [shopName, setShopName] = useState(getSetting('shop_name') ?? 'Mekha');
   const [vatRate, setVatRate] = useState(getSetting('vat_rate') ?? '7');
@@ -32,6 +43,9 @@ export default function SettingsScreen() {
   const [serviceChargeRate, setServiceChargeRate] = useState(getSetting('service_charge_rate') ?? '0');
   const [promptpayId, setPromptpayId] = useState('');
   const [lnAddress, setLnAddress] = useState('');
+  const [themePreference, setThemePreference] = useState<ThemePreference>(
+    normalizeThemePreference(getSetting(THEME_SETTING_KEY))
+  );
 
   // Track dirty state for save buttons
   const [initGeneral, setInitGeneral] = useState({
@@ -72,6 +86,13 @@ export default function SettingsScreen() {
     setInitGeneral({ shopName: trimmedShopName, vatRate, vatMode, serviceChargeRate });
     setShopName(trimmedShopName);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+  };
+
+  const handleThemePreference = (value: ThemePreference) => {
+    setThemePreference(value);
+    setSetting(THEME_SETTING_KEY, value);
+    setColorScheme(value);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
   };
 
   const handleToggleTables = (value: boolean) => {
@@ -450,60 +471,89 @@ export default function SettingsScreen() {
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-white" edges={['top']}>
+    <SafeAreaView className="flex-1 bg-white dark:bg-neutral-950" edges={['top']}>
       <ScrollView className="flex-1 px-4 pt-4" contentContainerStyle={{ paddingBottom: insets.bottom + 80 }}>
-        <Text className="text-2xl font-bold text-mekha-text mb-6">ตั้งค่า</Text>
+        <Text className="text-2xl font-bold text-mekha-text dark:text-neutral-50 mb-6">ตั้งค่า</Text>
 
         {/* General */}
         <SectionHeader title="ทั่วไป" />
-        <Text className="text-sm text-mekha-muted mb-1">ชื่อร้าน</Text>
+        <Text className="text-sm text-mekha-muted dark:text-neutral-400 mb-1">ธีม</Text>
+        <View className="flex-row gap-2 mb-4">
+          {[
+            { value: 'light', label: 'สว่าง' },
+            { value: 'dark', label: 'มืด' },
+            { value: 'system', label: 'ตามเครื่อง' },
+          ].map((option) => {
+            const isSelected = themePreference === option.value;
+            return (
+              <Pressable
+                key={option.value}
+                className={`flex-1 py-3 rounded-xl items-center border ${
+                  isSelected
+                    ? 'bg-purple-600 border-purple-600'
+                    : 'bg-mekha-surface dark:bg-neutral-900 border-mekha-border dark:border-neutral-800'
+                }`}
+                onPress={() => handleThemePreference(option.value as ThemePreference)}
+              >
+                <Text className={`text-sm font-semibold ${isSelected ? 'text-white' : 'text-mekha-text dark:text-neutral-50'}`}>
+                  {option.label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+
+        <Text className="text-sm text-mekha-muted dark:text-neutral-400 mb-1">ชื่อร้าน</Text>
         <TextInput
-          className="bg-mekha-surface border border-mekha-border rounded-xl px-4 py-3 mb-3 text-mekha-text"
+          className="bg-mekha-surface dark:bg-neutral-900 border border-mekha-border dark:border-neutral-800 rounded-xl px-4 py-3 mb-3 text-mekha-text dark:text-neutral-50"
           placeholder="ชื่อร้าน"
+          placeholderTextColor={placeholderColor}
           value={shopName}
           onChangeText={setShopName}
         />
-        <Text className="text-sm text-mekha-muted mb-1">VAT (%)</Text>
+        <Text className="text-sm text-mekha-muted dark:text-neutral-400 mb-1">VAT (%)</Text>
         <TextInput
-          className="bg-mekha-surface border border-mekha-border rounded-xl px-4 py-3 mb-3 text-mekha-text"
+          className="bg-mekha-surface dark:bg-neutral-900 border border-mekha-border dark:border-neutral-800 rounded-xl px-4 py-3 mb-3 text-mekha-text dark:text-neutral-50"
           placeholder="อัตรา VAT (%)"
+          placeholderTextColor={placeholderColor}
           value={vatRate}
           onChangeText={setVatRate}
           keyboardType="decimal-pad"
         />
-        <Text className="text-sm text-mekha-muted mb-1">โหมด VAT</Text>
+        <Text className="text-sm text-mekha-muted dark:text-neutral-400 mb-1">โหมด VAT</Text>
         <View className="flex-row gap-2 mb-3">
           <Pressable
             className={`flex-1 py-3 rounded-xl items-center border ${
-              vatMode === 'included' ? 'bg-purple-600 border-purple-600' : 'bg-mekha-surface border-mekha-border'
+              vatMode === 'included' ? 'bg-purple-600 border-purple-600' : 'bg-mekha-surface dark:bg-neutral-900 border-mekha-border dark:border-neutral-800'
             }`}
             onPress={() => setVatMode('included')}
           >
-            <Text className={`text-sm font-medium ${vatMode === 'included' ? 'text-white' : 'text-mekha-text'}`}>
+            <Text className={`text-sm font-medium ${vatMode === 'included' ? 'text-white' : 'text-mekha-text dark:text-neutral-50'}`}>
               ราคารวม VAT แล้ว
             </Text>
-            <Text className={`text-xs mt-0.5 ${vatMode === 'included' ? 'text-purple-200' : 'text-mekha-muted'}`}>
+            <Text className={`text-xs mt-0.5 ${vatMode === 'included' ? 'text-purple-200' : 'text-mekha-muted dark:text-neutral-400'}`}>
               ไม่ต้องบวกเพิ่ม
             </Text>
           </Pressable>
           <Pressable
             className={`flex-1 py-3 rounded-xl items-center border ${
-              vatMode === 'excluded' ? 'bg-purple-600 border-purple-600' : 'bg-mekha-surface border-mekha-border'
+              vatMode === 'excluded' ? 'bg-purple-600 border-purple-600' : 'bg-mekha-surface dark:bg-neutral-900 border-mekha-border dark:border-neutral-800'
             }`}
             onPress={() => setVatMode('excluded')}
           >
-            <Text className={`text-sm font-medium ${vatMode === 'excluded' ? 'text-white' : 'text-mekha-text'}`}>
+            <Text className={`text-sm font-medium ${vatMode === 'excluded' ? 'text-white' : 'text-mekha-text dark:text-neutral-50'}`}>
               ราคายังไม่รวม VAT
             </Text>
-            <Text className={`text-xs mt-0.5 ${vatMode === 'excluded' ? 'text-purple-200' : 'text-mekha-muted'}`}>
+            <Text className={`text-xs mt-0.5 ${vatMode === 'excluded' ? 'text-purple-200' : 'text-mekha-muted dark:text-neutral-400'}`}>
               บวก VAT เพิ่ม
             </Text>
           </Pressable>
         </View>
-        <Text className="text-sm text-mekha-muted mb-1">Service Charge (%)</Text>
+        <Text className="text-sm text-mekha-muted dark:text-neutral-400 mb-1">Service Charge (%)</Text>
         <TextInput
-          className="bg-mekha-surface border border-mekha-border rounded-xl px-4 py-3 mb-3 text-mekha-text"
+          className="bg-mekha-surface dark:bg-neutral-900 border border-mekha-border dark:border-neutral-800 rounded-xl px-4 py-3 mb-3 text-mekha-text dark:text-neutral-50"
           placeholder="เช่น 10 (0 = ไม่คิด)"
+          placeholderTextColor={placeholderColor}
           value={serviceChargeRate}
           onChangeText={setServiceChargeRate}
           keyboardType="decimal-pad"
@@ -518,18 +568,20 @@ export default function SettingsScreen() {
 
         {/* Payment */}
         <SectionHeader title="การชำระเงิน" />
-        <Text className="text-sm text-mekha-muted mb-1">PromptPay ID</Text>
+        <Text className="text-sm text-mekha-muted dark:text-neutral-400 mb-1">PromptPay ID</Text>
         <TextInput
-          className="bg-mekha-surface border border-mekha-border rounded-xl px-4 py-3 mb-3 text-mekha-text"
+          className="bg-mekha-surface dark:bg-neutral-900 border border-mekha-border dark:border-neutral-800 rounded-xl px-4 py-3 mb-3 text-mekha-text dark:text-neutral-50"
           placeholder="เบอร์โทร หรือ เลขบัตรประชาชน"
+          placeholderTextColor={placeholderColor}
           value={promptpayId}
           onChangeText={setPromptpayId}
           keyboardType="phone-pad"
         />
-        <Text className="text-sm text-mekha-muted mb-1">Lightning Address</Text>
+        <Text className="text-sm text-mekha-muted dark:text-neutral-400 mb-1">Lightning Address</Text>
         <TextInput
-          className="bg-mekha-surface border border-mekha-border rounded-xl px-4 py-3 mb-2 text-mekha-text"
+          className="bg-mekha-surface dark:bg-neutral-900 border border-mekha-border dark:border-neutral-800 rounded-xl px-4 py-3 mb-2 text-mekha-text dark:text-neutral-50"
           placeholder="user@domain.com"
+          placeholderTextColor={placeholderColor}
           value={lnAddress}
           onChangeText={setLnAddress}
           autoCapitalize="none"
@@ -546,8 +598,8 @@ export default function SettingsScreen() {
 
         {/* Roles & PIN */}
         <SectionHeader title="ระบบ PIN" />
-        <View className="flex-row items-center justify-between bg-mekha-surface border border-mekha-border rounded-xl px-4 py-2.5 mb-3">
-          <Text className="text-mekha-text font-medium">เปิดใช้ระบบ PIN</Text>
+        <View className="flex-row items-center justify-between bg-mekha-surface dark:bg-neutral-900 border border-mekha-border dark:border-neutral-800 rounded-xl px-4 py-2.5 mb-3">
+          <Text className="text-mekha-text dark:text-neutral-50 font-medium">เปิดใช้ระบบ PIN</Text>
           <Switch
             value={pinEnabled}
             onValueChange={handleTogglePin}
@@ -558,26 +610,28 @@ export default function SettingsScreen() {
 
         {!pinEnabled && (
           <View className="mb-3">
-            <Text className="text-sm text-mekha-muted mb-1">PIN เจ้าของร้าน</Text>
+            <Text className="text-sm text-mekha-muted dark:text-neutral-400 mb-1">PIN เจ้าของร้าน</Text>
             <TextInput
-              className="bg-mekha-surface border border-mekha-border rounded-xl px-4 py-3 mb-2 text-mekha-text"
+              className="bg-mekha-surface dark:bg-neutral-900 border border-mekha-border dark:border-neutral-800 rounded-xl px-4 py-3 mb-2 text-mekha-text dark:text-neutral-50"
               placeholder="6 หลัก"
+              placeholderTextColor={placeholderColor}
               value={ownerPin}
               onChangeText={setOwnerPin}
               keyboardType="number-pad"
               maxLength={6}
               secureTextEntry
             />
-            <Text className="text-xs text-mekha-muted mb-3">ใส่ PIN แล้วเปิด Switch ด้านบนเพื่อเปิดใช้ระบบ PIN</Text>
+            <Text className="text-xs text-mekha-muted dark:text-neutral-400 mb-3">ใส่ PIN แล้วเปิด Switch ด้านบนเพื่อเปิดใช้ระบบ PIN</Text>
           </View>
         )}
 
         {pinEnabled && (
           <>
-            <Text className="text-sm text-mekha-muted mb-1">PIN แคชเชียร์</Text>
+            <Text className="text-sm text-mekha-muted dark:text-neutral-400 mb-1">PIN แคชเชียร์</Text>
             <TextInput
-              className="bg-mekha-surface border border-mekha-border rounded-xl px-4 py-3 mb-3 text-mekha-text"
+              className="bg-mekha-surface dark:bg-neutral-900 border border-mekha-border dark:border-neutral-800 rounded-xl px-4 py-3 mb-3 text-mekha-text dark:text-neutral-50"
               placeholder="6 หลัก"
+              placeholderTextColor={placeholderColor}
               value={cashierPin}
               onChangeText={setCashierPin}
               keyboardType="number-pad"
@@ -585,10 +639,10 @@ export default function SettingsScreen() {
               secureTextEntry
             />
             <Pressable
-              className="bg-purple-50 border border-purple-200 py-3 rounded-xl items-center mb-6"
+              className="bg-purple-50 dark:bg-purple-950 border border-purple-200 dark:border-purple-900 py-3 rounded-xl items-center mb-6"
               onPress={handleSetCashierPin}
             >
-              <Text className="text-purple-700 font-semibold">ตั้ง PIN แคชเชียร์</Text>
+              <Text className="text-purple-700 dark:text-purple-300 font-semibold">ตั้ง PIN แคชเชียร์</Text>
             </Pressable>
           </>
         )}
@@ -597,8 +651,8 @@ export default function SettingsScreen() {
 
         {/* Table Management */}
         <SectionHeader title="ระบบโต๊ะ" />
-        <View className="flex-row items-center justify-between bg-mekha-surface border border-mekha-border rounded-xl px-4 py-2.5 mb-3">
-          <Text className="text-mekha-text font-medium">เปิดใช้ระบบโต๊ะ</Text>
+        <View className="flex-row items-center justify-between bg-mekha-surface dark:bg-neutral-900 border border-mekha-border dark:border-neutral-800 rounded-xl px-4 py-2.5 mb-3">
+          <Text className="text-mekha-text dark:text-neutral-50 font-medium">เปิดใช้ระบบโต๊ะ</Text>
           <Switch
             value={tablesEnabled}
             onValueChange={handleToggleTables}
@@ -611,8 +665,9 @@ export default function SettingsScreen() {
           <>
             <View className="flex-row gap-2 mb-3">
               <TextInput
-                className="flex-1 bg-mekha-surface border border-mekha-border rounded-xl px-4 py-3 text-mekha-text"
+                className="flex-1 bg-mekha-surface dark:bg-neutral-900 border border-mekha-border dark:border-neutral-800 rounded-xl px-4 py-3 text-mekha-text dark:text-neutral-50"
                 placeholder="ชื่อโต๊ะ เช่น โต๊ะ 1, A1, VIP"
+                placeholderTextColor={placeholderColor}
                 value={newTableName}
                 onChangeText={setNewTableName}
               />
@@ -625,23 +680,23 @@ export default function SettingsScreen() {
             </View>
 
             {tables.length > 0 && (
-              <View className="bg-mekha-surface border border-mekha-border rounded-xl p-3 mb-6">
+              <View className="bg-mekha-surface dark:bg-neutral-900 border border-mekha-border dark:border-neutral-800 rounded-xl p-3 mb-6">
                 {tables.map((table) => (
                   <View
                     key={table.id}
-                    className="flex-row items-center justify-between py-2 border-b border-mekha-border"
+                    className="flex-row items-center justify-between py-2 border-b border-mekha-border dark:border-neutral-800"
                   >
                     <View className="flex-row items-center gap-2">
                       <View className={`w-3 h-3 rounded-full ${
                         table.status === 'occupied' ? 'bg-red-500' : 'bg-green-500'
                       }`} />
-                      <Text className="font-medium text-mekha-text">{table.name}</Text>
+                      <Text className="font-medium text-mekha-text dark:text-neutral-50">{table.name}</Text>
                     </View>
                     <Pressable
-                      className="bg-red-50 px-3 py-1 rounded-lg"
+                      className="bg-red-50 dark:bg-red-950 px-3 py-1 rounded-lg"
                       onPress={() => handleDeleteTable(table.id, table.name)}
                     >
-                      <Text className="text-red-700 text-sm font-medium">ลบ</Text>
+                      <Text className="text-red-700 dark:text-red-300 text-sm font-medium">ลบ</Text>
                     </Pressable>
                   </View>
                 ))}
@@ -649,14 +704,14 @@ export default function SettingsScreen() {
             )}
 
             {tables.length === 0 && (
-              <Text className="text-mekha-muted text-sm mb-6">ยังไม่มีโต๊ะ เพิ่มโต๊ะด้านบน</Text>
+              <Text className="text-mekha-muted dark:text-neutral-400 text-sm mb-6">ยังไม่มีโต๊ะ เพิ่มโต๊ะด้านบน</Text>
             )}
           </>
         )}
 
         {/* Lightning Report */}
         <SectionHeader title="รายงาน Lightning" />
-        <Text className="text-sm text-mekha-muted mb-3">สร้างรายงานสรุปยอดจ่าย Lightning เพื่อเป็นหลักฐานเรียกเก็บเงิน</Text>
+        <Text className="text-sm text-mekha-muted dark:text-neutral-400 mb-3">สร้างรายงานสรุปยอดจ่าย Lightning เพื่อเป็นหลักฐานเรียกเก็บเงิน</Text>
         <View className="flex-row gap-2 mb-6">
           <Pressable
             className="flex-1 bg-amber-50 border border-amber-200 py-3 rounded-xl items-center"
@@ -681,22 +736,22 @@ export default function SettingsScreen() {
         {/* Data */}
         <SectionHeader title="ข้อมูล" />
         <Pressable
-          className="bg-mekha-surface border border-mekha-border py-3 rounded-xl items-center mb-3"
+          className="bg-mekha-surface dark:bg-neutral-900 border border-mekha-border dark:border-neutral-800 py-3 rounded-xl items-center mb-3"
           onPress={handleExportMenu}
         >
-          <Text className="text-mekha-text font-medium">ส่งออกเมนู (JSON)</Text>
+          <Text className="text-mekha-text dark:text-neutral-50 font-medium">ส่งออกเมนู (JSON)</Text>
         </Pressable>
         <Pressable
-          className="bg-mekha-surface border border-mekha-border py-3 rounded-xl items-center mb-3"
+          className="bg-mekha-surface dark:bg-neutral-900 border border-mekha-border dark:border-neutral-800 py-3 rounded-xl items-center mb-3"
           onPress={handleImportMenu}
         >
-          <Text className="text-mekha-text font-medium">นำเข้าเมนู (JSON)</Text>
+          <Text className="text-mekha-text dark:text-neutral-50 font-medium">นำเข้าเมนู (JSON)</Text>
         </Pressable>
         <Pressable
-          className="bg-mekha-surface border border-mekha-border py-3 rounded-xl items-center mb-6"
+          className="bg-mekha-surface dark:bg-neutral-900 border border-mekha-border dark:border-neutral-800 py-3 rounded-xl items-center mb-6"
           onPress={handleBackup}
         >
-          <Text className="text-mekha-text font-medium">สำรองข้อมูล</Text>
+          <Text className="text-mekha-text dark:text-neutral-50 font-medium">สำรองข้อมูล</Text>
         </Pressable>
         <Pressable
           className="bg-amber-50 border border-amber-200 py-3 rounded-xl items-center mb-6"
@@ -728,7 +783,7 @@ export default function SettingsScreen() {
 
 function SectionHeader({ title }: { title: string }) {
   return (
-    <Text className="text-base font-semibold text-mekha-text mb-3">{title}</Text>
+    <Text className="text-base font-semibold text-mekha-text dark:text-neutral-50 mb-3">{title}</Text>
   );
 }
 
@@ -738,15 +793,15 @@ function LnCacheStatus() {
 
   if (loading) {
     return (
-      <View className="bg-amber-50 rounded-lg px-3 py-2 mb-3">
-        <Text className="text-amber-700 text-xs">⚡ กำลังเชื่อมต่อ...</Text>
+      <View className="bg-amber-50 dark:bg-amber-950 rounded-lg px-3 py-2 mb-3">
+        <Text className="text-amber-700 dark:text-amber-200 text-xs">⚡ กำลังเชื่อมต่อ...</Text>
       </View>
     );
   }
   if (ready) {
     return (
-      <View className="bg-green-50 rounded-lg px-3 py-2 mb-3">
-        <Text className="text-green-700 text-xs">
+      <View className="bg-green-50 dark:bg-green-950 rounded-lg px-3 py-2 mb-3">
+        <Text className="text-green-700 dark:text-green-200 text-xs">
           ⚡ Lightning พร้อมใช้งาน · อัปเดต {minutesAgo === 0 ? 'เมื่อสักครู่' : `${minutesAgo} นาทีที่แล้ว`}
         </Text>
       </View>
@@ -754,8 +809,8 @@ function LnCacheStatus() {
   }
   if (error) {
     return (
-      <View className="bg-red-50 rounded-lg px-3 py-2 mb-3">
-        <Text className="text-red-700 text-xs">⚡ {error}</Text>
+      <View className="bg-red-50 dark:bg-red-950 rounded-lg px-3 py-2 mb-3">
+        <Text className="text-red-700 dark:text-red-200 text-xs">⚡ {error}</Text>
       </View>
     );
   }

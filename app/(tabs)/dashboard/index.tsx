@@ -83,12 +83,12 @@ export default function DashboardScreen() {
   const methodLabel = PAYMENT_FILTERS.find((f) => f.value === selectedMethod)?.label ?? 'ทั้งหมด';
 
   return (
-    <SafeAreaView className="flex-1 bg-white" edges={['top']}>
+    <SafeAreaView className="flex-1 bg-white dark:bg-neutral-950" edges={['top']}>
       <ScrollView className="flex-1 px-4 pt-4" contentContainerStyle={{ paddingBottom: insets.bottom + 80 }}>
-        <Text className="text-2xl font-bold text-mekha-text mb-4">Dashboard</Text>
+        <Text className="text-2xl font-bold text-mekha-text dark:text-neutral-50 mb-4">Dashboard</Text>
 
         {/* Date Range Filter */}
-        <Text className="text-sm font-semibold text-mekha-text mb-2">ช่วงเวลา</Text>
+        <Text className="text-sm font-semibold text-mekha-text dark:text-neutral-50 mb-2">ช่วงเวลา</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mb-3">
           <View className="flex-row gap-2">
             {DATE_RANGES.map((range) => (
@@ -97,13 +97,13 @@ export default function DashboardScreen() {
                 className={`px-4 py-2 rounded-full border ${
                   selectedRange === range.days
                     ? 'bg-purple-600 border-purple-600'
-                    : 'bg-purple-50 border-purple-200'
+                    : 'bg-purple-50 dark:bg-purple-950 border-purple-200 dark:border-purple-900'
                 }`}
                 onPress={() => setSelectedRange(range.days)}
               >
                 <Text
                   className={`text-sm font-medium ${
-                    selectedRange === range.days ? 'text-white' : 'text-purple-700'
+                    selectedRange === range.days ? 'text-white' : 'text-purple-700 dark:text-purple-300'
                   }`}
                 >
                   {range.label}
@@ -114,7 +114,7 @@ export default function DashboardScreen() {
         </ScrollView>
 
         {/* Payment Method Filter */}
-        <Text className="text-sm font-semibold text-mekha-text mb-2">วิธีชำระ</Text>
+        <Text className="text-sm font-semibold text-mekha-text dark:text-neutral-50 mb-2">วิธีชำระ</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mb-4">
           <View className="flex-row gap-2">
             {PAYMENT_FILTERS.map((filter) => (
@@ -123,13 +123,13 @@ export default function DashboardScreen() {
                 className={`px-4 py-2 rounded-full border ${
                   selectedMethod === filter.value
                     ? 'bg-purple-600 border-purple-600'
-                    : 'bg-purple-50 border-purple-200'
+                    : 'bg-purple-50 dark:bg-purple-950 border-purple-200 dark:border-purple-900'
                 }`}
                 onPress={() => setSelectedMethod(filter.value)}
               >
                 <Text
                   className={`text-sm font-medium ${
-                    selectedMethod === filter.value ? 'text-white' : 'text-purple-700'
+                    selectedMethod === filter.value ? 'text-white' : 'text-purple-700 dark:text-purple-300'
                   }`}
                 >
                   {filter.label}
@@ -141,9 +141,9 @@ export default function DashboardScreen() {
 
         {/* Revenue Cards */}
         <View className="flex-row gap-3 mb-6">
-          <View className="flex-1 bg-purple-50 rounded-2xl p-4">
-            <Text className="text-xs text-purple-700 mb-1">วันนี้</Text>
-            <Text className="text-xl font-bold text-purple-600">
+          <View className="flex-1 bg-purple-50 dark:bg-purple-950 rounded-2xl p-4">
+            <Text className="text-xs text-purple-700 dark:text-purple-300 mb-1">วันนี้</Text>
+            <Text className="text-xl font-bold text-purple-600 dark:text-purple-200">
               ฿{todayRevenue.toLocaleString()}
             </Text>
           </View>
@@ -162,10 +162,10 @@ export default function DashboardScreen() {
 
         {/* Average per transaction */}
         {filteredCount > 0 && (
-          <View className="bg-blue-50 rounded-2xl p-4 mb-6">
+          <View className="bg-blue-50 dark:bg-blue-950 rounded-2xl p-4 mb-6">
             <View className="flex-row justify-between">
-              <Text className="text-sm text-blue-900">ค่าเฉลี่ยต่อรายการ</Text>
-              <Text className="text-lg font-bold text-blue-600">
+              <Text className="text-sm text-blue-900 dark:text-blue-200">ค่าเฉลี่ยต่อรายการ</Text>
+              <Text className="text-lg font-bold text-blue-600 dark:text-blue-300">
                 ฿{(filteredTotal / filteredCount).toFixed(0)}
               </Text>
             </View>
@@ -173,12 +173,12 @@ export default function DashboardScreen() {
         )}
 
         {/* Payment Method Breakdown */}
-        <Text className="text-lg font-semibold text-mekha-text mb-3">
+        <Text className="text-lg font-semibold text-mekha-text dark:text-neutral-50 mb-3">
           สัดส่วนการชำระ ({rangeLabel})
         </Text>
         <View className="mb-6">
           {breakdown.length === 0 ? (
-            <Text className="text-mekha-muted text-sm">ยังไม่มีข้อมูล</Text>
+            <Text className="text-mekha-muted dark:text-neutral-400 text-sm">ยังไม่มีข้อมูล</Text>
           ) : (
             breakdown.map((item) => {
               const total = breakdown.reduce((s, b) => s + b.total, 0);
@@ -187,21 +187,21 @@ export default function DashboardScreen() {
                 <Pressable
                   key={item.method}
                   className={`mb-2 p-3 rounded-xl ${
-                    selectedMethod === item.method ? 'bg-purple-100 border border-purple-300' : ''
+                    selectedMethod === item.method ? 'bg-purple-100 dark:bg-purple-950 border border-purple-300 dark:border-purple-900' : ''
                   }`}
                   onPress={() =>
                     setSelectedMethod(selectedMethod === item.method ? null : item.method)
                   }
                 >
                   <View className="flex-row justify-between mb-1">
-                    <Text className="text-sm text-mekha-text">
+                    <Text className="text-sm text-mekha-text dark:text-neutral-50">
                       {METHOD_LABELS[item.method] ?? item.method} ({item.count})
                     </Text>
-                    <Text className="text-sm font-semibold text-mekha-text">
+                    <Text className="text-sm font-semibold text-mekha-text dark:text-neutral-50">
                       ฿{item.total.toLocaleString()} ({pct.toFixed(0)}%)
                     </Text>
                   </View>
-                  <View className="h-2 bg-purple-100 rounded-full overflow-hidden">
+                  <View className="h-2 bg-purple-100 dark:bg-purple-950 rounded-full overflow-hidden">
                     <View
                       className="h-full bg-purple-600 rounded-full"
                       style={{ width: `${pct}%` }}
@@ -214,33 +214,33 @@ export default function DashboardScreen() {
         </View>
 
         {/* Top Items */}
-        <Text className="text-lg font-semibold text-mekha-text mb-3">
+        <Text className="text-lg font-semibold text-mekha-text dark:text-neutral-50 mb-3">
           เมนูขายดี {selectedMethod ? `(${methodLabel})` : ''}
         </Text>
         <View className="mb-6">
           {topItems.length === 0 ? (
-            <Text className="text-mekha-muted text-sm">ยังไม่มีข้อมูล</Text>
+            <Text className="text-mekha-muted dark:text-neutral-400 text-sm">ยังไม่มีข้อมูล</Text>
           ) : (
             topItems.map((item, idx) => (
               <View
                 key={item.menu_name}
-                className="flex-row items-center justify-between py-2 border-b border-mekha-border"
+                className="flex-row items-center justify-between py-2 border-b border-mekha-border dark:border-neutral-800"
               >
                 <View className="flex-row items-center gap-2 flex-1">
                   <View className={`w-6 h-6 rounded-full items-center justify-center ${
-                    idx < 3 ? 'bg-purple-600' : 'bg-purple-100'
+                    idx < 3 ? 'bg-purple-600' : 'bg-purple-100 dark:bg-purple-950'
                   }`}>
-                    <Text className={`text-xs font-bold ${idx < 3 ? 'text-white' : 'text-purple-700'}`}>
+                    <Text className={`text-xs font-bold ${idx < 3 ? 'text-white' : 'text-purple-700 dark:text-purple-300'}`}>
                       {idx + 1}
                     </Text>
                   </View>
-                  <Text className="text-sm text-mekha-text flex-1">{item.menu_name}</Text>
+                  <Text className="text-sm text-mekha-text dark:text-neutral-50 flex-1">{item.menu_name}</Text>
                 </View>
                 <View className="items-end">
-                  <Text className="text-sm font-medium text-purple-600">
+                  <Text className="text-sm font-medium text-purple-600 dark:text-purple-300">
                     {item.quantity} ชิ้น
                   </Text>
-                  <Text className="text-xs text-mekha-muted">
+                  <Text className="text-xs text-mekha-muted dark:text-neutral-400">
                     ฿{item.revenue?.toLocaleString() ?? 0}
                   </Text>
                 </View>
@@ -252,7 +252,7 @@ export default function DashboardScreen() {
         {/* Daily Revenue Chart */}
         {dailyRevenue.length > 0 && (
           <>
-            <Text className="text-lg font-semibold text-mekha-text mb-3">
+            <Text className="text-lg font-semibold text-mekha-text dark:text-neutral-50 mb-3">
               ยอดขายรายวัน ({rangeLabel})
             </Text>
             <View className="mb-6">
@@ -260,16 +260,16 @@ export default function DashboardScreen() {
                 const pct = maxDaily > 0 ? (day.total / maxDaily) * 100 : 0;
                 return (
                   <View key={day.date} className="flex-row items-center py-2 gap-3">
-                    <Text className="text-xs text-mekha-muted w-12">
+                    <Text className="text-xs text-mekha-muted dark:text-neutral-400 w-12">
                       {`${day.date.substring(8, 10)}/${day.date.substring(5, 7)}`}
                     </Text>
-                    <View className="flex-1 h-5 bg-purple-50 rounded-full overflow-hidden">
+                    <View className="flex-1 h-5 bg-purple-50 dark:bg-purple-950 rounded-full overflow-hidden">
                       <View
                         className="h-full bg-purple-500 rounded-full"
                         style={{ width: `${Math.max(pct, 2)}%` }}
                       />
                     </View>
-                    <Text className="text-xs font-medium text-mekha-text w-16 text-right">
+                    <Text className="text-xs font-medium text-mekha-text dark:text-neutral-50 w-16 text-right">
                       ฿{day.total.toLocaleString()}
                     </Text>
                   </View>
@@ -281,10 +281,10 @@ export default function DashboardScreen() {
 
         {/* Export */}
         <Pressable
-          className="bg-purple-50 border border-purple-200 py-3 rounded-2xl items-center mb-8"
+          className="bg-purple-50 dark:bg-purple-950 border border-purple-200 dark:border-purple-900 py-3 rounded-2xl items-center mb-8"
           onPress={handleExport}
         >
-          <Text className="text-purple-700 font-medium">Export CSV</Text>
+          <Text className="text-purple-700 dark:text-purple-300 font-medium">Export CSV</Text>
         </Pressable>
       </ScrollView>
     </SafeAreaView>

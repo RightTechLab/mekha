@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
-import { View, Text, Pressable, TextInput, ScrollView, Image, Alert, Modal, KeyboardAvoidingView, Platform, TouchableWithoutFeedback } from 'react-native';
+import { View, Text, Pressable, TextInput, ScrollView, Image, Alert, Modal, KeyboardAvoidingView, Platform, TouchableWithoutFeedback, Keyboard } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { useColorScheme } from 'nativewind';
 import * as Haptics from 'expo-haptics';
 import * as Crypto from 'expo-crypto';
 import * as ImagePicker from 'expo-image-picker';
@@ -19,6 +20,7 @@ import {
 } from '../db/repositories/menuRepo';
 import type { CategoryItem } from '../db/repositories/menuRepo';
 import type { Menu, OptionGroup, OptionItem } from '../types';
+import { DARK_PLACEHOLDER, LIGHT_PLACEHOLDER } from '../constants/theme';
 
 interface Props {
   visible: boolean;
@@ -29,6 +31,10 @@ interface Props {
 
 export default function MenuFormModal({ visible, menuId, onClose, onSaved }: Props) {
   const insets = useSafeAreaInsets();
+  const { colorScheme } = useColorScheme();
+  const isDark = colorScheme === 'dark';
+  const placeholderColor = isDark ? DARK_PLACEHOLDER : LIGHT_PLACEHOLDER;
+  const mutedIconColor = isDark ? '#A1A1AA' : '#6B7280';
   const isEditMode = menuId !== null;
   const menu = menuId ? getMenuById(menuId) : null;
   const allCategories: CategoryItem[] = getAllCategories();
@@ -42,6 +48,7 @@ export default function MenuFormModal({ visible, menuId, onClose, onSaved }: Pro
   const [newItemName, setNewItemName] = useState('');
   const [newItemPrice, setNewItemPrice] = useState('');
   const [activeGroupId, setActiveGroupId] = useState<string | null>(null);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
 
   useEffect(() => {
     if (visible) {
@@ -65,6 +72,20 @@ export default function MenuFormModal({ visible, menuId, onClose, onSaved }: Pro
       setActiveGroupId(null);
     }
   }, [visible, menuId]);
+
+  useEffect(() => {
+    const showSub = Keyboard.addListener('keyboardDidShow', (event) => {
+      setKeyboardHeight(event.endCoordinates.height);
+    });
+    const hideSub = Keyboard.addListener('keyboardDidHide', () => {
+      setKeyboardHeight(0);
+    });
+
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
 
   const handleSave = () => {
     const priceNum = parseFloat(price);
@@ -196,14 +217,17 @@ export default function MenuFormModal({ visible, menuId, onClose, onSaved }: Pro
           <TouchableWithoutFeedback onPress={handleDismiss}>
             <Animated.View className="absolute inset-0 bg-black/50" style={overlayStyle} />
           </TouchableWithoutFeedback>
-          <Animated.View className="bg-white rounded-t-3xl max-h-[90%]" style={sheetStyle}>
+          <Animated.View
+            className="bg-white dark:bg-neutral-950 rounded-t-3xl max-h-[90%]"
+            style={[sheetStyle, keyboardHeight > 0 ? { height: '90%' } : undefined]}
+          >
             {/* Header */}
-            <View className="px-5 pt-5 pb-3 border-b border-mekha-border flex-row items-center justify-between">
-              <Text className="text-xl font-bold text-mekha-text">
+            <View className="px-5 pt-5 pb-3 border-b border-mekha-border dark:border-neutral-800 flex-row items-center justify-between">
+              <Text className="text-xl font-bold text-mekha-text dark:text-neutral-50">
                 {isEditMode ? 'แก้ไขเมนู' : 'เพิ่มเมนู'}
               </Text>
               <Pressable onPress={handleDismiss} className="p-2">
-                <Text className="text-mekha-muted text-lg">✕</Text>
+                <Ionicons name="close" size={22} color={mutedIconColor} />
               </Pressable>
             </View>
 
@@ -212,16 +236,19 @@ export default function MenuFormModal({ visible, menuId, onClose, onSaved }: Pro
               contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}
               showsVerticalScrollIndicator={false}
               keyboardShouldPersistTaps="handled"
+              keyboardDismissMode="on-drag"
             >
               <TextInput
-                className="bg-mekha-surface border border-mekha-border rounded-xl px-4 py-3 mb-3 text-mekha-text"
+                className="bg-mekha-surface dark:bg-neutral-900 border border-mekha-border dark:border-neutral-800 rounded-xl px-4 py-3 mb-3 text-mekha-text dark:text-neutral-50"
                 placeholder="ชื่อเมนู"
+                placeholderTextColor={placeholderColor}
                 value={name}
                 onChangeText={setName}
               />
               <TextInput
-                className="bg-mekha-surface border border-mekha-border rounded-xl px-4 py-3 mb-3 text-mekha-text"
+                className="bg-mekha-surface dark:bg-neutral-900 border border-mekha-border dark:border-neutral-800 rounded-xl px-4 py-3 mb-3 text-mekha-text dark:text-neutral-50"
                 placeholder="ราคา (฿)"
+                placeholderTextColor={placeholderColor}
                 value={price}
                 onChangeText={setPrice}
                 keyboardType="decimal-pad"
@@ -229,20 +256,20 @@ export default function MenuFormModal({ visible, menuId, onClose, onSaved }: Pro
 
               {/* Category dropdown */}
               <View className="mb-3">
-                <Text className="text-sm text-mekha-muted mb-1.5">หมวดหมู่</Text>
+                <Text className="text-sm text-mekha-muted dark:text-neutral-400 mb-1.5">หมวดหมู่</Text>
                 {allCategories.length > 0 ? (
-                  <View className="bg-mekha-surface border border-mekha-border rounded-xl overflow-hidden">
+                  <View className="bg-mekha-surface dark:bg-neutral-900 border border-mekha-border dark:border-neutral-800 rounded-xl overflow-hidden">
                     <ScrollView horizontal={false} style={{ maxHeight: 150 }} nestedScrollEnabled>
                       {allCategories.map((cat) => {
                         const isSelected = category === cat.name;
                         return (
                           <Pressable
                             key={cat.id}
-                            className={`px-4 py-3 border-b border-mekha-border ${isSelected ? 'bg-purple-50' : ''}`}
+                            className={`px-4 py-3 border-b border-mekha-border dark:border-neutral-800 ${isSelected ? 'bg-purple-50 dark:bg-purple-950' : ''}`}
                             onPress={() => setCategory(isSelected ? '' : cat.name)}
                           >
                             <View className="flex-row items-center justify-between">
-                              <Text className={`text-sm ${isSelected ? 'text-purple-700 font-semibold' : 'text-mekha-text'}`}>
+                              <Text className={`text-sm ${isSelected ? 'text-purple-700 dark:text-purple-300 font-semibold' : 'text-mekha-text dark:text-neutral-50'}`}>
                                 {cat.name}
                               </Text>
                               {isSelected && <Ionicons name="checkmark-circle" size={18} color="#7C3AED" />}
@@ -253,11 +280,11 @@ export default function MenuFormModal({ visible, menuId, onClose, onSaved }: Pro
                     </ScrollView>
                   </View>
                 ) : (
-                  <View className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
-                    <Text className="text-amber-700 text-sm text-center">ยังไม่มีหมวดหมู่</Text>
+                  <View className="bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-900 rounded-xl px-4 py-3">
+                    <Text className="text-amber-700 dark:text-amber-200 text-sm text-center">ยังไม่มีหมวดหมู่</Text>
                   </View>
                 )}
-                {category ? <Text className="text-xs text-purple-600 mt-1">เลือก: {category}</Text> : null}
+                {category ? <Text className="text-xs text-purple-600 dark:text-purple-300 mt-1">เลือก: {category}</Text> : null}
               </View>
 
               {/* Image */}
@@ -279,19 +306,19 @@ export default function MenuFormModal({ visible, menuId, onClose, onSaved }: Pro
               {/* Option Groups — only in edit mode */}
               {isEditMode && (
                 <>
-                  <Text className="text-base font-bold text-mekha-text mb-3">ตัวเลือก (Options)</Text>
+                  <Text className="text-base font-bold text-mekha-text dark:text-neutral-50 mb-3">ตัวเลือก (Options)</Text>
                   {optionGroups.map((group) => (
-                    <View key={group.id} className="mb-3 p-3 bg-mekha-surface border border-mekha-border rounded-xl">
+                    <View key={group.id} className="mb-3 p-3 bg-mekha-surface dark:bg-neutral-900 border border-mekha-border dark:border-neutral-800 rounded-xl">
                       <View className="flex-row items-center justify-between mb-2">
-                        <Text className="font-semibold text-mekha-text text-sm">{group.name}</Text>
+                        <Text className="font-semibold text-mekha-text dark:text-neutral-50 text-sm">{group.name}</Text>
                         <Pressable onPress={() => handleDeleteGroup(group.id)}>
-                          <Text className="text-red-700 text-xs">ลบกลุ่ม</Text>
+                          <Text className="text-red-700 dark:text-red-400 text-xs">ลบกลุ่ม</Text>
                         </Pressable>
                       </View>
                       {group.items.map((item) => (
                         <View key={item.id} className="flex-row justify-between py-1">
-                          <Text className="text-mekha-text text-sm">{item.name}</Text>
-                          <Text className="text-mekha-muted text-sm">
+                          <Text className="text-mekha-text dark:text-neutral-50 text-sm">{item.name}</Text>
+                          <Text className="text-mekha-muted dark:text-neutral-400 text-sm">
                             {item.price_delta > 0 ? `+฿${item.price_delta}` : 'ฟรี'}
                           </Text>
                         </View>
@@ -299,14 +326,16 @@ export default function MenuFormModal({ visible, menuId, onClose, onSaved }: Pro
                       {activeGroupId === group.id ? (
                         <View className="mt-2 flex-row gap-2">
                           <TextInput
-                            className="flex-1 bg-white border border-mekha-border rounded-lg px-3 py-2 text-sm"
+                            className="flex-1 bg-white dark:bg-neutral-950 border border-mekha-border dark:border-neutral-800 rounded-lg px-3 py-2 text-sm text-mekha-text dark:text-neutral-50"
                             placeholder="ชื่อ"
+                            placeholderTextColor={placeholderColor}
                             value={newItemName}
                             onChangeText={setNewItemName}
                           />
                           <TextInput
-                            className="w-20 bg-white border border-mekha-border rounded-lg px-3 py-2 text-sm"
+                            className="w-20 bg-white dark:bg-neutral-950 border border-mekha-border dark:border-neutral-800 rounded-lg px-3 py-2 text-sm text-mekha-text dark:text-neutral-50"
                             placeholder="+฿"
+                            placeholderTextColor={placeholderColor}
                             value={newItemPrice}
                             onChangeText={setNewItemPrice}
                             keyboardType="decimal-pad"
@@ -317,20 +346,21 @@ export default function MenuFormModal({ visible, menuId, onClose, onSaved }: Pro
                         </View>
                       ) : (
                         <Pressable className="mt-2" onPress={() => setActiveGroupId(group.id)}>
-                          <Text className="text-purple-600 text-sm">+ เพิ่มตัวเลือก</Text>
+                          <Text className="text-purple-600 dark:text-purple-300 text-sm">+ เพิ่มตัวเลือก</Text>
                         </Pressable>
                       )}
                     </View>
                   ))}
                   <View className="flex-row gap-2 mb-4">
                     <TextInput
-                      className="flex-1 bg-mekha-surface border border-mekha-border rounded-xl px-4 py-3"
+                      className="flex-1 bg-mekha-surface dark:bg-neutral-900 border border-mekha-border dark:border-neutral-800 rounded-xl px-4 py-3 text-mekha-text dark:text-neutral-50"
                       placeholder="ชื่อกลุ่มตัวเลือกใหม่"
+                      placeholderTextColor={placeholderColor}
                       value={newGroupName}
                       onChangeText={setNewGroupName}
                     />
-                    <Pressable className="bg-purple-50 px-4 rounded-xl items-center justify-center" onPress={handleAddGroup}>
-                      <Text className="text-purple-700 font-semibold">เพิ่ม</Text>
+                    <Pressable className="bg-purple-50 dark:bg-purple-950 px-4 rounded-xl items-center justify-center" onPress={handleAddGroup}>
+                      <Text className="text-purple-700 dark:text-purple-300 font-semibold">เพิ่ม</Text>
                     </Pressable>
                   </View>
                 </>
@@ -338,7 +368,7 @@ export default function MenuFormModal({ visible, menuId, onClose, onSaved }: Pro
             </ScrollView>
 
             {/* Save button */}
-            <View className="px-5 pt-3 border-t border-mekha-border" style={{ paddingBottom: Math.max(insets.bottom, 16) }}>
+            <View className="px-5 pt-3 border-t border-mekha-border dark:border-neutral-800 bg-white dark:bg-neutral-950" style={{ paddingBottom: Math.max(insets.bottom, 16) }}>
               <Pressable className="w-full py-4 rounded-2xl items-center bg-purple-600 active:bg-purple-700" onPress={handleSave}>
                 <Text className="text-white font-semibold text-base">
                   {isEditMode ? 'บันทึก' : 'เพิ่มเมนู'}

@@ -59,15 +59,15 @@ export default function MenuScreen() {
   }, []);
 
   return (
-    <SafeAreaView className="flex-1 bg-white" edges={['top']}>
+    <SafeAreaView className="flex-1 bg-white dark:bg-neutral-950" edges={['top']}>
       <View className="px-4 pt-4 pb-2 flex-row items-center justify-between">
-        <Text className="text-2xl font-bold text-mekha-text">จัดการเมนู</Text>
+        <Text className="text-2xl font-bold text-mekha-text dark:text-neutral-50">จัดการเมนู</Text>
         <View className="flex-row gap-2">
           <Pressable
-            className="px-3 py-2 rounded-full bg-purple-50"
+            className="px-3 py-2 rounded-full bg-purple-50 dark:bg-purple-950"
             onPress={() => setShowCatModal(true)}
           >
-            <Text className="text-purple-700 font-medium text-sm">หมวดหมู่</Text>
+            <Text className="text-purple-700 dark:text-purple-300 font-medium text-sm">หมวดหมู่</Text>
           </Pressable>
           <Pressable
             className="bg-purple-600 px-4 py-2 rounded-full"
@@ -80,7 +80,7 @@ export default function MenuScreen() {
 
       {menus.length === 0 ? (
         <View className="flex-1 items-center justify-center">
-          <Text className="text-mekha-muted">ยังไม่มีเมนู</Text>
+          <Text className="text-mekha-muted dark:text-neutral-400">ยังไม่มีเมนู</Text>
         </View>
       ) : (
         <FlashList
@@ -89,17 +89,17 @@ export default function MenuScreen() {
           contentContainerStyle={{ padding: 16, paddingBottom: insets.bottom + 80 }}
           renderItem={({ item }) => (
             <Pressable
-              className="flex-row items-center justify-between py-4 px-4 mb-2 bg-mekha-surface border border-mekha-border rounded-2xl"
+              className="flex-row items-center justify-between py-4 px-4 mb-2 bg-mekha-surface dark:bg-neutral-900 border border-mekha-border dark:border-neutral-800 rounded-2xl"
               onPress={() => handleOpenEditMenu(item.id)}
               onLongPress={() => handleDelete(item.id, item.name)}
             >
               <View className="flex-1">
-                <Text className="text-base font-medium text-mekha-text">{item.name}</Text>
+                <Text className="text-base font-medium text-mekha-text dark:text-neutral-50">{item.name}</Text>
                 {item.category && (
-                  <Text className="text-xs text-mekha-muted mt-0.5">{item.category}</Text>
+                  <Text className="text-xs text-mekha-muted dark:text-neutral-400 mt-0.5">{item.category}</Text>
                 )}
               </View>
-              <Text className="text-base font-semibold text-purple-600">
+              <Text className="text-base font-semibold text-purple-600 dark:text-purple-300">
                 ฿{item.price.toFixed(0)}
               </Text>
             </Pressable>

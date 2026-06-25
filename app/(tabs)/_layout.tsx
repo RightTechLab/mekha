@@ -2,6 +2,7 @@ import { Tabs } from 'expo-router';
 import { View, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { useColorScheme } from 'nativewind';
 import { useSessionStore } from '../../src/features/auth/sessionStore';
 import { isTablet } from '../../src/constants/layout';
 
@@ -10,16 +11,18 @@ export default function TabsLayout() {
   const isOwner = role === 'owner';
   const insets = useSafeAreaInsets();
   const bottomPadding = Math.max(insets.bottom, 8);
+  const { colorScheme } = useColorScheme();
+  const isDark = colorScheme === 'dark';
 
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
         tabBarActiveTintColor: '#7C3AED',
-        tabBarInactiveTintColor: '#6B7280',
+        tabBarInactiveTintColor: isDark ? '#9CA3AF' : '#6B7280',
         tabBarStyle: {
-          backgroundColor: '#FFFFFF',
-          borderTopColor: '#F0EDFC',
+          backgroundColor: isDark ? '#111827' : '#FFFFFF',
+          borderTopColor: isDark ? '#27272A' : '#F0EDFC',
           paddingBottom: bottomPadding,
           height: 56 + bottomPadding,
         },

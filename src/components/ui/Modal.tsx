@@ -21,12 +21,12 @@ export function Modal({ visible, onClose, title, children }: ModalProps) {
         onPress={onClose}
       >
         <Pressable
-          className="w-full max-w-md bg-white rounded-2xl p-6"
+          className="w-full max-w-md bg-white dark:bg-neutral-950 rounded-2xl p-6"
           onPress={(e) => e.stopPropagation()}
         >
           {title && (
             <View className="flex-row items-center justify-between mb-4">
-              <Text className="text-lg font-bold text-mekha-text">{title}</Text>
+              <Text className="text-lg font-bold text-mekha-text dark:text-neutral-50">{title}</Text>
               <Pressable onPress={onClose}>
                 <Text className="text-mekha-muted text-lg">✕</Text>
               </Pressable>

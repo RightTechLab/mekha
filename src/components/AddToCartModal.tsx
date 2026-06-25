@@ -1,10 +1,13 @@
 import { useState, useEffect } from 'react';
 import { View, Text, Pressable, TextInput, ScrollView, Modal, KeyboardAvoidingView, Platform, TouchableWithoutFeedback } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
+import { useColorScheme } from 'nativewind';
 import * as Haptics from 'expo-haptics';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming, runOnJS } from 'react-native-reanimated';
 import { getOptionGroups, getOptionItems } from '../db/repositories/menuRepo';
 import type { Menu, OptionGroup, OptionItem, SelectedOption, CartItem } from '../types';
+import { DARK_PLACEHOLDER, LIGHT_PLACEHOLDER } from '../constants/theme';
 
 interface Props {
   visible: boolean;
@@ -15,6 +18,10 @@ interface Props {
 
 export default function AddToCartModal({ visible, menu, onClose, onAdd }: Props) {
   const insets = useSafeAreaInsets();
+  const { colorScheme } = useColorScheme();
+  const isDark = colorScheme === 'dark';
+  const placeholderColor = isDark ? DARK_PLACEHOLDER : LIGHT_PLACEHOLDER;
+  const mutedIconColor = isDark ? '#A1A1AA' : '#6B7280';
   const [quantity, setQuantity] = useState(1);
   const [note, setNote] = useState('');
   const [groups, setGroups] = useState<(OptionGroup & { items: OptionItem[] })[]>([]);
@@ -129,16 +136,16 @@ export default function AddToCartModal({ visible, menu, onClose, onAdd }: Props)
         <TouchableWithoutFeedback onPress={handleDismiss}>
           <Animated.View className="absolute inset-0 bg-black/40" style={overlayStyle} />
         </TouchableWithoutFeedback>
-        <Animated.View className="bg-white rounded-t-3xl max-h-[80%]" style={sheetStyle}>
+        <Animated.View className="bg-white dark:bg-neutral-950 rounded-t-3xl max-h-[80%]" style={sheetStyle}>
           {/* Header */}
-          <View className="px-5 pt-5 pb-3 border-b border-mekha-border">
+          <View className="px-5 pt-5 pb-3 border-b border-mekha-border dark:border-neutral-800">
             <View className="flex-row items-center justify-between">
-              <Text className="text-xl font-bold text-mekha-text">{menu.name}</Text>
+              <Text className="text-xl font-bold text-mekha-text dark:text-neutral-50">{menu.name}</Text>
               <Pressable onPress={onClose} className="p-2">
-                <Text className="text-mekha-muted text-lg">✕</Text>
+                <Ionicons name="close" size={22} color={mutedIconColor} />
               </Pressable>
             </View>
-            <Text className="text-purple-600 font-semibold mt-1">฿{menu.price.toFixed(0)}</Text>
+            <Text className="text-purple-600 dark:text-purple-300 font-semibold mt-1">฿{menu.price.toFixed(0)}</Text>
           </View>
 
           <ScrollView className="px-5 py-4" showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
@@ -146,15 +153,15 @@ export default function AddToCartModal({ visible, menu, onClose, onAdd }: Props)
             {groups.map((group) => (
               <View key={group.id} className="mb-5">
                 <View className="flex-row items-center gap-2 mb-2">
-                  <Text className="text-base font-semibold text-mekha-text">{group.name}</Text>
+                  <Text className="text-base font-semibold text-mekha-text dark:text-neutral-50">{group.name}</Text>
                   {group.required ? (
-                    <View className="bg-red-50 px-2 py-0.5 rounded">
-                      <Text className="text-xs text-red-700">จำเป็น</Text>
+                    <View className="bg-red-50 dark:bg-red-950 px-2 py-0.5 rounded">
+                      <Text className="text-xs text-red-700 dark:text-red-300">จำเป็น</Text>
                     </View>
                   ) : null}
                   {group.multiple ? (
-                    <View className="bg-purple-50 px-2 py-0.5 rounded">
-                      <Text className="text-xs text-purple-700">เลือกหลายได้</Text>
+                    <View className="bg-purple-50 dark:bg-purple-950 px-2 py-0.5 rounded">
+                      <Text className="text-xs text-purple-700 dark:text-purple-300">เลือกหลายได้</Text>
                     </View>
                   ) : null}
                 </View>
@@ -165,20 +172,20 @@ export default function AddToCartModal({ visible, menu, onClose, onAdd }: Props)
                       key={item.id}
                       className={`flex-row items-center justify-between py-3 px-4 mb-1 rounded-xl border ${
                         isSelected
-                          ? 'border-purple-600 bg-purple-50'
-                          : 'border-mekha-border bg-white'
+                          ? 'border-purple-600 bg-purple-50 dark:bg-purple-950'
+                          : 'border-mekha-border dark:border-neutral-800 bg-white dark:bg-neutral-900'
                       }`}
                       onPress={() => toggleOption(group.id, item.id, !!group.multiple)}
                     >
                       <Text
                         className={`text-sm ${
-                          isSelected ? 'text-purple-700 font-medium' : 'text-mekha-text'
+                          isSelected ? 'text-purple-700 dark:text-purple-300 font-medium' : 'text-mekha-text dark:text-neutral-50'
                         }`}
                       >
                         {item.name}
                       </Text>
                       {item.price_delta !== 0 && (
-                        <Text className="text-xs text-mekha-muted">
+                        <Text className="text-xs text-mekha-muted dark:text-neutral-400">
                           +฿{item.price_delta.toFixed(0)}
                         </Text>
                       )}
@@ -190,11 +197,11 @@ export default function AddToCartModal({ visible, menu, onClose, onAdd }: Props)
 
             {/* Note */}
             <View className="mb-5">
-              <Text className="text-base font-semibold text-mekha-text mb-2">หมายเหตุ</Text>
+              <Text className="text-base font-semibold text-mekha-text dark:text-neutral-50 mb-2">หมายเหตุ</Text>
               <TextInput
-                className="border border-mekha-border rounded-xl px-4 py-3 text-sm text-mekha-text"
+                className="border border-mekha-border dark:border-neutral-800 rounded-xl px-4 py-3 text-sm text-mekha-text dark:text-neutral-50 bg-white dark:bg-neutral-900"
                 placeholder="เช่น ไม่ใส่ผัก, เพิ่มข้าว..."
-                placeholderTextColor="#9CA3AF"
+                placeholderTextColor={placeholderColor}
                 value={note}
                 onChangeText={setNote}
                 multiline
@@ -203,23 +210,23 @@ export default function AddToCartModal({ visible, menu, onClose, onAdd }: Props)
           </ScrollView>
 
           {/* Quantity + Add button */}
-          <View className="px-5 pt-3 border-t border-mekha-border" style={{ paddingBottom: Math.max(insets.bottom, 16) }}>
+          <View className="px-5 pt-3 border-t border-mekha-border dark:border-neutral-800 bg-white dark:bg-neutral-950" style={{ paddingBottom: Math.max(insets.bottom, 16) }}>
             {/* Qty control */}
             <View className="flex-row items-center justify-center gap-6 mb-4">
               <Pressable
-                className="w-10 h-10 rounded-full bg-purple-50 items-center justify-center"
+                className="w-10 h-10 rounded-full bg-purple-50 dark:bg-purple-950 items-center justify-center"
                 onPress={() => setQuantity((q) => Math.max(1, q - 1))}
               >
-                <Text className="text-purple-700 text-xl font-bold">−</Text>
+                <Text className="text-purple-700 dark:text-purple-300 text-xl font-bold">−</Text>
               </Pressable>
-              <Text className="text-2xl font-bold text-mekha-text w-10 text-center">
+              <Text className="text-2xl font-bold text-mekha-text dark:text-neutral-50 w-10 text-center">
                 {quantity}
               </Text>
               <Pressable
-                className="w-10 h-10 rounded-full bg-purple-50 items-center justify-center"
+                className="w-10 h-10 rounded-full bg-purple-50 dark:bg-purple-950 items-center justify-center"
                 onPress={() => setQuantity((q) => q + 1)}
               >
-                <Text className="text-purple-700 text-xl font-bold">+</Text>
+                <Text className="text-purple-700 dark:text-purple-300 text-xl font-bold">+</Text>
               </Pressable>
             </View>
 

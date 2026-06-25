@@ -47,12 +47,12 @@ export default function NumPad({ value, onChange, maxLength = 10 }: NumPadProps)
           {row.map((key) => (
             <Pressable
               key={key}
-              className="flex-1 h-14 items-center justify-center mx-1 rounded-xl bg-purple-50 active:bg-purple-100"
+              className="flex-1 h-14 items-center justify-center mx-1 rounded-xl bg-purple-50 dark:bg-neutral-900 active:bg-purple-100 dark:active:bg-neutral-800"
               onPress={() => handlePress(key)}
             >
               <Text
                 className={`text-lg font-semibold ${
-                  key === 'DEL' ? 'text-red-400' : 'text-mekha-text'
+                  key === 'DEL' ? 'text-red-400' : 'text-mekha-text dark:text-neutral-50'
                 }`}
               >
                 {key === 'DEL' ? '⌫' : key}
