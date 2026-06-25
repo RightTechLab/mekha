@@ -3,7 +3,7 @@
     "name": "Mekha",
     "slug": "mekha",
     "scheme": "mekha",
-    "version": "1.0.3",
+    "version": "1.0.4",
     "orientation": "default",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",

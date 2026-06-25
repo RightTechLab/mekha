@@ -149,7 +149,10 @@ export default function CategoryFormModal({ visible, onClose, onSaved }: Props) 
           <TouchableWithoutFeedback onPress={handleDismiss}>
             <Animated.View className="absolute inset-0 bg-black/50" style={overlayStyle} />
           </TouchableWithoutFeedback>
-          <Animated.View className="bg-white rounded-t-3xl max-h-[90%]" style={sheetStyle}>
+          <Animated.View
+            className="bg-white rounded-t-3xl max-h-[90%]"
+            style={[sheetStyle, keyboardHeight > 0 ? { height: '90%' } : undefined]}
+          >
             {/* Header */}
             <View className="px-5 pt-5 pb-3 border-b border-mekha-border flex-row items-center justify-between">
               <Text className="text-xl font-bold text-mekha-text">จัดการหมวดหมู่</Text>
@@ -167,9 +170,10 @@ export default function CategoryFormModal({ visible, onClose, onSaved }: Props) 
 
             <ScrollView
               className="px-5 py-4"
-              contentContainerStyle={{ paddingBottom: insets.bottom + 24 + (keyboardHeight > 0 ? 120 : 0) }}
+              contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}
               showsVerticalScrollIndicator={false}
               keyboardShouldPersistTaps="handled"
+              keyboardDismissMode="on-drag"
             >
               {/* Add new category */}
               <Text className="text-sm text-mekha-muted mb-1.5">เพิ่มหมวดหมู่ใหม่</Text>
